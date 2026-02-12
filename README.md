@@ -29,20 +29,6 @@ A complete RFID-based payment system with real-time card management, transaction
 - **Frontend Port**: 9208
 - **MQTT Broker**: 157.173.101.159:1883
 
-## Quick Start
-
-### Local Development
-
-#### Windows:
-```bash
-start-local.bat
-```
-
-#### Linux/Mac:
-```bash
-chmod +x start-local.sh
-./start-local.sh
-```
 
 #### Manual Start:
 ```bash
@@ -80,7 +66,6 @@ chmod +x deploy.sh
 - Frontend: http://157.173.101.159:9208
 - Backend: http://157.173.101.159:8208
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
 
 ## 📡 MQTT Topics
 
