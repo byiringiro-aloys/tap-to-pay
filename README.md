@@ -2,14 +2,14 @@
 
 A complete RFID-based payment system with real-time card management, transaction tracking, and a modern dashboard interface.
 
-## � Live Demo
+## 🤖 Live Demo
 
-**🚀 Access the live application:** [http://157.173.101.159:9208](http://157.173.101.159:9208)
+** Access the live application:** [http://157.173.101.159:9208](http://157.173.101.159:9208)
 
 - Frontend: http://157.173.101.159:9208
 - Backend API: http://157.173.101.159:8208
 
-## ��� Features
+## 👁️ Features
 
 - Real-time RFID card detection via MQTT
 - Cumulative balance top-ups with persistent storage
@@ -29,7 +29,7 @@ A complete RFID-based payment system with real-time card management, transaction
 - **Frontend Port**: 9208
 - **MQTT Broker**: 157.173.101.159:1883
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Local Development
 
