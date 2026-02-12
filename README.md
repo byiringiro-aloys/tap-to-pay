@@ -4,7 +4,7 @@ A complete RFID-based payment system with real-time card management, transaction
 
 ## 🤖 Live Demo
 
-** Access the live application:** [http://157.173.101.159:9208](http://157.173.101.159:9208)
+** Access the live application: ** [http://157.173.101.159:9208](http://157.173.101.159:9208)
 
 - Frontend: http://157.173.101.159:9208
 - Backend API: http://157.173.101.159:8208
