@@ -54,10 +54,21 @@ const transactionSchema = new mongoose.Schema({
 
 const Transaction = mongoose.model('Transaction', transactionSchema);
 
+// Product catalog
+const PRODUCTS = [
+  { id: 'coffee', name: 'Coffee', price: 2.50, icon: '☕' },
+  { id: 'sandwich', name: 'Sandwich', price: 5.00, icon: '🥪' },
+  { id: 'water', name: 'Water Bottle', price: 1.00, icon: '💧' },
+  { id: 'snack', name: 'Snack Pack', price: 3.00, icon: '🍿' },
+  { id: 'juice', name: 'Fresh Juice', price: 3.50, icon: '🧃' },
+  { id: 'salad', name: 'Salad Bowl', price: 6.00, icon: '🥗' }
+];
+
 // Topics
 const TOPIC_STATUS = `rfid/${TEAM_ID}/card/status`;
 const TOPIC_BALANCE = `rfid/${TEAM_ID}/card/balance`;
 const TOPIC_TOPUP = `rfid/${TEAM_ID}/card/topup`;
+const TOPIC_PAYMENT = `rfid/${TEAM_ID}/card/payment`;
 
 // MQTT Client Setup
 const mqttClient = mqtt.connect(MQTT_BROKER);
@@ -66,6 +77,7 @@ mqttClient.on('connect', () => {
   console.log('Connected to MQTT Broker');
   mqttClient.subscribe(TOPIC_STATUS);
   mqttClient.subscribe(TOPIC_BALANCE);
+  mqttClient.subscribe(TOPIC_PAYMENT);
 });
 
 mqttClient.on('message', (topic, message) => {
@@ -77,6 +89,8 @@ mqttClient.on('message', (topic, message) => {
       io.emit('card-status', payload);
     } else if (topic === TOPIC_BALANCE) {
       io.emit('card-balance', payload);
+    } else if (topic === TOPIC_PAYMENT) {
+      io.emit('payment-result', payload);
     }
   } catch (err) {
     console.error('Failed to parse MQTT message:', err);
@@ -95,7 +109,7 @@ app.post('/topup', async (req, res) => {
     // Find or create card
     let card = await Card.findOne({ uid });
     const balanceBefore = card ? card.balance : 0;
-    
+
     if (!card) {
       if (!holderName) {
         return res.status(400).json({ error: 'Holder name is required for new cards' });
@@ -132,8 +146,8 @@ app.post('/topup', async (req, res) => {
       console.log(`Published topup for ${uid} (${card.holderName}): ${card.balance}`);
     });
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'Topup successful',
       card: {
         uid: card.uid,
@@ -152,6 +166,122 @@ app.post('/topup', async (req, res) => {
     console.error('Database error:', err);
     res.status(500).json({ error: 'Database operation failed' });
   }
+});
+
+// Payment / Debit endpoint
+app.post('/pay', async (req, res) => {
+  const { uid, productId, amount, description } = req.body;
+
+  if (!uid || (!productId && amount === undefined)) {
+    return res.status(400).json({ error: 'UID and product or amount are required' });
+  }
+
+  try {
+    // Resolve amount from product catalog or use direct amount
+    let payAmount = amount;
+    let payDescription = description || 'Payment';
+
+    if (productId) {
+      const product = PRODUCTS.find(p => p.id === productId);
+      if (!product) {
+        return res.status(400).json({ error: 'Invalid product ID' });
+      }
+      payAmount = product.price;
+      payDescription = `Purchase: ${product.name}`;
+    }
+
+    if (!payAmount || payAmount <= 0) {
+      return res.status(400).json({ error: 'Invalid payment amount' });
+    }
+
+    // Find card
+    const card = await Card.findOne({ uid });
+    if (!card) {
+      return res.status(404).json({ error: 'Card not found. Please top up first.' });
+    }
+
+    // Check sufficient balance
+    if (card.balance < payAmount) {
+      return res.status(400).json({
+        error: 'Insufficient balance',
+        currentBalance: card.balance,
+        required: payAmount,
+        shortfall: payAmount - card.balance
+      });
+    }
+
+    const balanceBefore = card.balance;
+
+    // Deduct amount
+    card.balance -= payAmount;
+    card.updatedAt = Date.now();
+    await card.save();
+
+    // Create transaction record
+    const transaction = new Transaction({
+      uid: card.uid,
+      holderName: card.holderName,
+      type: 'debit',
+      amount: payAmount,
+      balanceBefore: balanceBefore,
+      balanceAfter: card.balance,
+      description: payDescription
+    });
+    await transaction.save();
+
+    // Publish to MQTT so ESP8266 updates
+    const payload = JSON.stringify({
+      uid,
+      amount: card.balance,
+      deducted: payAmount,
+      description: payDescription,
+      status: 'success'
+    });
+    mqttClient.publish(TOPIC_PAYMENT, payload, (err) => {
+      if (err) {
+        console.error('Failed to publish payment:', err);
+      }
+      console.log(`Published payment for ${uid} (${card.holderName}): -$${payAmount.toFixed(2)}, balance: $${card.balance.toFixed(2)}`);
+    });
+
+    // Emit real-time update via WebSocket
+    io.emit('payment-success', {
+      uid: card.uid,
+      holderName: card.holderName,
+      amount: payAmount,
+      balanceBefore,
+      balanceAfter: card.balance,
+      description: payDescription,
+      timestamp: transaction.timestamp
+    });
+
+    res.json({
+      success: true,
+      message: 'Payment successful',
+      card: {
+        uid: card.uid,
+        holderName: card.holderName,
+        balance: card.balance
+      },
+      transaction: {
+        id: transaction._id,
+        type: 'debit',
+        amount: payAmount,
+        balanceBefore,
+        balanceAfter: card.balance,
+        description: payDescription,
+        timestamp: transaction.timestamp
+      }
+    });
+  } catch (err) {
+    console.error('Payment error:', err);
+    res.status(500).json({ error: 'Payment processing failed' });
+  }
+});
+
+// Products catalog endpoint
+app.get('/products', (req, res) => {
+  res.json(PRODUCTS);
 });
 
 // Get card details
@@ -208,7 +338,7 @@ app.get('/transactions', async (req, res) => {
 
 // Socket connectivity
 io.on('connection', (socket) => {
-  console.log('A user connected to the dashboard');
+  console.log('User connected to the dashboard');
   socket.on('disconnect', () => {
     console.log('User disconnected');
   });
