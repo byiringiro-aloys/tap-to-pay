@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>IoT RFID Dashboard</title>
   <link rel="stylesheet" href="style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="config.js"></script>
 </head>
@@ -28,53 +28,32 @@
       </div>
 
       <nav class="sidebar-nav">
-        <a href="#" class="nav-item active">
+        <a href="#" class="nav-item active" data-section="topup">
           <span class="nav-icon">💳</span>
-          <span class="nav-text">Cards</span>
+          <span class="nav-text">Top Up Card</span>
         </a>
-        <a href="#" class="nav-item">
+        <a href="#" class="nav-item" data-section="marketplace">
+          <span class="nav-icon">🛒</span>
+          <span class="nav-text">Marketplace</span>
+        </a>
+        <a href="#" class="nav-item" data-section="history">
           <span class="nav-icon">📊</span>
-          <span class="nav-text">Analytics</span>
+          <span class="nav-text">Transactions</span>
         </a>
-        <a href="#" class="nav-item">
+        <a href="#" class="nav-item" data-section="settings">
           <span class="nav-icon">⚙️</span>
           <span class="nav-text">Settings</span>
         </a>
       </nav>
 
-      <div class="system-status">
-        <h3>System Status</h3>
-        <div class="status-item">
-          <div class="status-label">
-            <span class="status-dot" id="mqtt-status"></span>
-            MQTT Broker
-          </div>
-          <div class="status-value" id="mqtt-status-text">Connecting...</div>
-        </div>
-        <div class="status-item">
-          <div class="status-label">
-            <span class="status-dot" id="backend-status"></span>
-            Backend Server
-          </div>
-          <div class="status-value" id="backend-status-text">Connecting...</div>
-        </div>
-        <div class="status-item">
-          <div class="status-label">
-            <span class="status-dot" id="db-status"></span>
-            Database
-          </div>
-          <div class="status-value" id="db-status-text">Unknown</div>
-        </div>
-      </div>
-
-      <div class="sidebar-footer">
-        <div class="team-info">
-          <span class="team-label">Team ID</span>
-          <span class="team-value">team_rdf</span>
-        </div>
-        <div class="uptime">
-          <span class="uptime-label">Uptime</span>
-          <span class="uptime-value" id="uptime">00:00:00</span>
+      <div class="sidebar-support">
+        <div class="support-card">
+          <div class="support-icon">💬</div>
+          <h4>Need Help?</h4>
+          <p>Get in touch with our support team for assistance.</p>
+          <a href="mailto:byiringiroaloys8@gmail.com" class="support-link">
+            <span>✉️</span> support@aloys.work
+          </a>
         </div>
       </div>
     </aside>
@@ -100,71 +79,305 @@
         <div class="stat-card-main">
           <div class="stat-icon">💰</div>
           <div class="stat-content">
-            <div class="stat-label">Total Volume</div>
+            <div class="stat-label">Top-Up Volume</div>
             <div class="stat-value" id="total-volume">$0.00</div>
           </div>
         </div>
         <div class="stat-card-main">
-          <div class="stat-icon">⚡</div>
+          <div class="stat-icon">🛍️</div>
           <div class="stat-content">
-            <div class="stat-label">Avg. Transaction</div>
-            <div class="stat-value" id="avg-transaction">$0.00</div>
+            <div class="stat-label">Total Purchases</div>
+            <div class="stat-value" id="total-payments">$0.00</div>
           </div>
         </div>
       </div>
 
-      <div class="content-grid">
-        <!-- Card Status Section -->
-        <div class="glass-card card-status-section">
-          <h3>Active Card</h3>
-          <div class="card-visual-container">
-            <div id="card-visual" class="card-visual">
-              <div class="card-chip"></div>
-              <div class="card-number">**** **** **** ****</div>
-              <div class="card-details">
-                <div class="card-holder-group">
-                  <span class="card-label">CARD HOLDER</span>
-                  <span id="card-uid-display" class="card-value">NO CARD</span>
+      <!-- ===================== SECTION: TOP UP CARD ===================== -->
+      <div id="section-topup" class="page-section active-section">
+        <div class="section-header">
+          <h2 class="section-title">💳 Top Up Card</h2>
+          <p class="section-subtitle">Scan your RFID card and add funds to your balance</p>
+        </div>
+
+        <div class="content-grid">
+          <!-- Card Status -->
+          <div class="glass-card card-status-section">
+            <h3>Active Card</h3>
+            <div class="card-visual-container">
+              <div id="card-visual" class="card-visual">
+                <div class="card-chip"></div>
+                <div class="card-number">**** **** **** ****</div>
+                <div class="card-details">
+                  <div class="card-holder-group">
+                    <span class="card-label">CARD HOLDER</span>
+                    <span id="card-uid-display" class="card-value">NO CARD</span>
+                  </div>
+                  <div class="card-balance-group">
+                    <span class="card-label">BALANCE</span>
+                    <span id="card-balance-display" class="card-value">$0.00</span>
+                  </div>
                 </div>
-                <div class="card-balance-group">
-                  <span class="card-label">BALANCE</span>
-                  <span id="card-balance-display" class="card-value">$0.00</span>
+              </div>
+            </div>
+            <div id="status-display" class="status-content">
+              <div class="status-placeholder">Scan an RFID card to begin...</div>
+            </div>
+          </div>
+
+          <!-- Top Up Form -->
+          <div class="glass-card topup-section">
+            <h3>Add Funds</h3>
+            <div class="input-group">
+              <label for="uid">Card UID</label>
+              <input type="text" id="uid" placeholder="UID auto-populated on scan" readonly>
+            </div>
+            <div class="input-group">
+              <label for="holderName">Card Holder Name</label>
+              <input type="text" id="holderName" placeholder="Enter name for new cards">
+            </div>
+            <div class="quick-amounts">
+              <button class="quick-amount-btn" data-amount="5">$5</button>
+              <button class="quick-amount-btn" data-amount="10">$10</button>
+              <button class="quick-amount-btn" data-amount="20">$20</button>
+              <button class="quick-amount-btn" data-amount="50">$50</button>
+            </div>
+            <div class="input-group">
+              <label for="amount">Custom Amount ($)</label>
+              <input type="number" id="amount" placeholder="0.00" step="0.01">
+            </div>
+            <button id="topup-btn" class="topup-btn" disabled>
+              <span class="btn-icon">💳</span> Confirm Top Up
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== SECTION: MARKETPLACE ===================== -->
+      <div id="section-marketplace" class="page-section">
+        <div class="section-header">
+          <h2 class="section-title">🛒 Marketplace</h2>
+          <p class="section-subtitle">Browse products and pay with your RFID card</p>
+        </div>
+
+        <div class="marketplace-layout">
+          <!-- Product Grid -->
+          <div class="glass-card marketplace-products">
+            <div class="marketplace-header">
+              <h3>Available Products</h3>
+              <div class="cart-badge" id="cart-badge" style="display: none;">
+                <span id="cart-count">0</span>
+              </div>
+            </div>
+            <div class="product-grid" id="product-grid">
+              <!-- Products loaded dynamically -->
+            </div>
+          </div>
+
+          <!-- Shopping Cart -->
+          <div class="glass-card shopping-cart">
+            <h3>🛍️ Shopping Cart</h3>
+            <div id="cart-items" class="cart-items">
+              <div class="cart-empty">
+                <span class="cart-empty-icon">🛒</span>
+                <p>Your cart is empty</p>
+                <p class="cart-empty-hint">Click products to add them</p>
+              </div>
+            </div>
+            <div class="cart-summary" id="cart-summary" style="display: none;">
+              <div class="cart-summary-row">
+                <span>Items</span>
+                <span id="cart-total-items">0</span>
+              </div>
+              <div class="cart-summary-row cart-total-row">
+                <span>Total</span>
+                <span id="cart-total-price">$0.00</span>
+              </div>
+            </div>
+            <div id="payment-status-msg" class="payment-status-msg"></div>
+            <button id="checkout-btn" class="checkout-btn" disabled>
+              <span class="btn-icon">💳</span> Checkout & Pay
+            </button>
+            <p class="checkout-hint" id="checkout-hint">Scan your card first to enable checkout</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== SECTION: TRANSACTION HISTORY ===================== -->
+      <div id="section-history" class="page-section">
+        <div class="section-header">
+          <h2 class="section-title">📊 Transaction History</h2>
+          <p class="section-subtitle">View all top-ups and purchase records</p>
+        </div>
+
+        <div class="history-layout">
+          <!-- Top-Up History -->
+          <div class="glass-card history-panel">
+            <div class="history-panel-header">
+              <h3>💰 Top-Up History</h3>
+              <span class="history-count" id="topup-count">0 records</span>
+            </div>
+            <div id="topup-history" class="transaction-list">
+              <p class="empty-history">No top-up transactions yet</p>
+            </div>
+          </div>
+
+          <!-- Purchase History -->
+          <div class="glass-card history-panel">
+            <div class="history-panel-header">
+              <h3>🛍️ Purchase History</h3>
+              <span class="history-count" id="purchase-count">0 records</span>
+            </div>
+            <div id="purchase-history" class="transaction-list">
+              <p class="empty-history">No purchase transactions yet</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== SECTION: SETTINGS ===================== -->
+      <div id="section-settings" class="page-section">
+        <div class="section-header">
+          <h2 class="section-title">⚙️ Settings & System Info</h2>
+          <p class="section-subtitle">Monitor system health, view statistics, and configuration details</p>
+        </div>
+
+        <div class="settings-layout">
+          <!-- System Status Panel -->
+          <div class="glass-card settings-panel">
+            <h3>🔌 System Status</h3>
+            <div class="settings-status-grid">
+              <div class="settings-status-card">
+                <div class="settings-status-icon online" id="settings-mqtt-indicator"></div>
+                <div class="settings-status-info">
+                  <div class="settings-status-name">MQTT Broker</div>
+                  <div class="settings-status-detail" id="settings-mqtt-status">Connecting...</div>
+                </div>
+              </div>
+              <div class="settings-status-card">
+                <div class="settings-status-icon online" id="settings-backend-indicator"></div>
+                <div class="settings-status-info">
+                  <div class="settings-status-name">Backend Server</div>
+                  <div class="settings-status-detail" id="settings-backend-status">Connecting...</div>
+                </div>
+              </div>
+              <div class="settings-status-card">
+                <div class="settings-status-icon" id="settings-db-indicator"></div>
+                <div class="settings-status-info">
+                  <div class="settings-status-name">MongoDB Database</div>
+                  <div class="settings-status-detail" id="settings-db-status">Unknown</div>
+                </div>
+              </div>
+              <div class="settings-status-card">
+                <div class="settings-status-icon" id="settings-ws-indicator"></div>
+                <div class="settings-status-info">
+                  <div class="settings-status-name">WebSocket</div>
+                  <div class="settings-status-detail" id="settings-ws-status">Connecting...</div>
                 </div>
               </div>
             </div>
           </div>
-          <div id="status-display" class="status-content">
-            <div class="status-placeholder">Scan an RFID card to begin...</div>
-          </div>
-        </div>
 
-        <!-- Top Up Section -->
-        <div class="glass-card topup-section">
-          <h3>Top Up Card</h3>
-          <div class="input-group">
-            <label for="uid">Card UID</label>
-            <input type="text" id="uid" placeholder="UID auto-populated" readonly>
+          <!-- Overview Statistics -->
+          <div class="glass-card settings-panel">
+            <h3>📈 Overview Statistics</h3>
+            <div class="settings-stats-grid">
+              <div class="settings-stat-card">
+                <div class="settings-stat-icon">💳</div>
+                <div class="settings-stat-value" id="settings-total-cards">0</div>
+                <div class="settings-stat-label">Registered Cards</div>
+              </div>
+              <div class="settings-stat-card">
+                <div class="settings-stat-icon">📊</div>
+                <div class="settings-stat-value" id="settings-total-transactions">0</div>
+                <div class="settings-stat-label">Total Transactions</div>
+              </div>
+              <div class="settings-stat-card">
+                <div class="settings-stat-icon">💰</div>
+                <div class="settings-stat-value" id="settings-topup-volume">$0.00</div>
+                <div class="settings-stat-label">Top-Up Volume</div>
+              </div>
+              <div class="settings-stat-card">
+                <div class="settings-stat-icon">🛍️</div>
+                <div class="settings-stat-value" id="settings-purchase-volume">$0.00</div>
+                <div class="settings-stat-label">Purchase Volume</div>
+              </div>
+              <div class="settings-stat-card">
+                <div class="settings-stat-icon">📅</div>
+                <div class="settings-stat-value" id="settings-today-tx">0</div>
+                <div class="settings-stat-label">Today's Transactions</div>
+              </div>
+              <div class="settings-stat-card">
+                <div class="settings-stat-icon">💵</div>
+                <div class="settings-stat-value" id="settings-net-balance">$0.00</div>
+                <div class="settings-stat-label">Net Card Balance</div>
+              </div>
+            </div>
           </div>
-          <div class="input-group">
-            <label for="holderName">Card Holder Name</label>
-            <input type="text" id="holderName" placeholder="Enter name for new cards">
-          </div>
-          <div class="input-group">
-            <label for="amount">Amount ($)</label>
-            <input type="number" id="amount" placeholder="0.00" step="0.01">
-          </div>
-          <button id="topup-btn" disabled>Confirm Top Up</button>
-        </div>
 
-        <!-- Transaction History Section -->
-        <div class="glass-card transaction-section">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-            <h3 style="margin: 0;">Transaction History</h3>
-            <button id="view-all-btn" class="view-all-btn" style="display: none;">View All Transactions</button>
+          <!-- System Information -->
+          <div class="glass-card settings-panel">
+            <h3>🖥️ System Information</h3>
+            <div class="settings-info-list">
+              <div class="settings-info-row">
+                <span class="settings-info-label">Application</span>
+                <span class="settings-info-value">RFID Shield Dashboard</span>
+              </div>
+              <div class="settings-info-row">
+                <span class="settings-info-label">Version</span>
+                <span class="settings-info-value">1.2.0</span>
+              </div>
+              <div class="settings-info-row">
+                <span class="settings-info-label">Team ID</span>
+                <span class="settings-info-value badge">team_rdf</span>
+              </div>
+              <div class="settings-info-row">
+                <span class="settings-info-label">Backend URL</span>
+                <span class="settings-info-value mono" id="settings-backend-url">—</span>
+              </div>
+              <div class="settings-info-row">
+                <span class="settings-info-label">MQTT Broker</span>
+                <span class="settings-info-value mono">broker.benax.rw:1883</span>
+              </div>
+              <div class="settings-info-row">
+                <span class="settings-info-label">Database</span>
+                <span class="settings-info-value mono">MongoDB Atlas</span>
+              </div>
+              <div class="settings-info-row">
+                <span class="settings-info-label">WebSocket</span>
+                <span class="settings-info-value mono">Socket.IO v4.7.2</span>
+              </div>
+            </div>
           </div>
-          <div id="transaction-history" class="transaction-list"></div>
+
+          <!-- MQTT Topics -->
+          <div class="glass-card settings-panel">
+            <h3>📡 MQTT Topic Configuration</h3>
+            <div class="settings-info-list">
+              <div class="settings-info-row">
+                <span class="settings-info-label">Card Status</span>
+                <span class="settings-info-value mono topic">rfid/team_rdf/card/status</span>
+              </div>
+              <div class="settings-info-row">
+                <span class="settings-info-label">Card Balance</span>
+                <span class="settings-info-value mono topic">rfid/team_rdf/card/balance</span>
+              </div>
+              <div class="settings-info-row">
+                <span class="settings-info-label">Top-Up</span>
+                <span class="settings-info-value mono topic">rfid/team_rdf/card/topup</span>
+              </div>
+              <div class="settings-info-row">
+                <span class="settings-info-label">Payment</span>
+                <span class="settings-info-value mono topic">rfid/team_rdf/card/payment</span>
+              </div>
+              <div class="settings-info-row">
+                <span class="settings-info-label">Topic Prefix</span>
+                <span class="settings-info-value mono badge">rfid/team_rdf/</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+
     </main>
   </div>
   <script src="app.js"></script>
