@@ -12,6 +12,30 @@
 </head>
 
 <body>
+  <!-- Role Selection Popup -->
+  <div id="role-selection-overlay" class="role-overlay">
+    <div class="role-popup">
+      <div class="role-popup-header">
+        <h2>Welcome to RFID Shield</h2>
+        <p>Please select your role to continue</p>
+      </div>
+      <div class="role-options">
+        <div class="role-card" data-role="admin">
+          <div class="role-icon">👨‍💼</div>
+          <h3>Administrator</h3>
+          <p>Full access to all features including system settings and configurations</p>
+          <button class="role-select-btn">Select</button>
+        </div>
+        <div class="role-card" data-role="user">
+          <div class="role-icon">👤</div>
+          <h3>Normal User</h3>
+          <p>Access to top-up, marketplace, and transaction history</p>
+          <button class="role-select-btn">Select</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="dashboard">
     <!-- Sidebar -->
     <aside class="sidebar">

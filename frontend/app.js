@@ -10,6 +10,10 @@ const cardVisual = document.getElementById('card-visual');
 const cardUidDisplay = document.getElementById('card-uid-display');
 const cardBalanceDisplay = document.getElementById('card-balance-display');
 
+// Role selection elements
+const roleOverlay = document.getElementById('role-selection-overlay');
+const roleCards = document.querySelectorAll('.role-card');
+
 // Marketplace elements
 const productGrid = document.getElementById('product-grid');
 const cartItemsEl = document.getElementById('cart-items');
@@ -68,6 +72,54 @@ let currentCardData = null;
 let startTime = Date.now();
 let cart = []; // Shopping cart: [{product, qty}]
 let allProducts = [];
+let userRole = null; // 'admin' or 'user'
+
+// ==================== Role Selection ====================
+roleCards.forEach(card => {
+  card.addEventListener('click', () => {
+    const role = card.dataset.role;
+    selectRole(role);
+  });
+  
+  // Also handle button click
+  const btn = card.querySelector('.role-select-btn');
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const role = card.dataset.role;
+    selectRole(role);
+  });
+});
+
+function selectRole(role) {
+  userRole = role;
+  
+  // Hide the overlay
+  roleOverlay.classList.add('hidden');
+  
+  // If normal user, hide settings navigation and section
+  if (role === 'user') {
+    const settingsNavItem = document.querySelector('.nav-item[data-section="settings"]');
+    if (settingsNavItem) {
+      settingsNavItem.style.display = 'none';
+    }
+    
+    const settingsSection = document.getElementById('section-settings');
+    if (settingsSection) {
+      settingsSection.style.display = 'none';
+    }
+  }
+  
+  // Store role in sessionStorage (optional, for persistence during session)
+  sessionStorage.setItem('userRole', role);
+}
+
+// Check if role was previously selected in this session
+window.addEventListener('DOMContentLoaded', () => {
+  const savedRole = sessionStorage.getItem('userRole');
+  if (savedRole) {
+    selectRole(savedRole);
+  }
+});
 
 // ==================== Navigation ====================
 const statsGrid = document.querySelector('.stats-grid');
