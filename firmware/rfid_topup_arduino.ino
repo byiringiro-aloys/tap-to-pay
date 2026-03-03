@@ -247,7 +247,7 @@ void loop() {
         lastDetectedUID = uid;
         cardPresent = true;
         
-        float currentBalance = 50.0; // Simulated balance
+        float currentBalance = 0;
 
         Serial.print("Card Detected: ");
         Serial.print(uid);
