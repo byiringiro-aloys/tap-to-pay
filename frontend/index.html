@@ -147,21 +147,57 @@
         </div>
         <form id="setup-password-form" class="login-form" autocomplete="off">
           <div id="setup-error" class="login-error" style="display:none;"></div>
+          
           <div class="login-input-group">
             <label for="setup-password">New Password</label>
             <div class="login-input-wrapper">
               <span class="input-icon">🔒</span>
-              <input type="password" id="setup-password" placeholder="Minimum 6 characters" required minlength="6">
+              <input type="password" id="setup-password" placeholder="Minimum 6 characters" required minlength="6" autocomplete="new-password">
+              <button type="button" class="password-toggle" id="setup-password-toggle" tabindex="-1">
+                <span class="toggle-icon">👁️</span>
+              </button>
+            </div>
+            <!-- Password Strength Indicator -->
+            <div class="password-strength" id="setup-password-strength" style="display:none;">
+              <div class="strength-bar">
+                <div class="strength-bar-fill" id="setup-strength-fill"></div>
+              </div>
+              <div class="strength-text" id="setup-strength-text">Password strength</div>
+            </div>
+            <!-- Password Requirements -->
+            <div class="password-requirements" id="setup-requirements">
+              <div class="requirement" id="req-length">
+                <span class="req-icon">○</span>
+                <span class="req-text">At least 6 characters</span>
+              </div>
+              <div class="requirement" id="req-letter">
+                <span class="req-icon">○</span>
+                <span class="req-text">Contains a letter</span>
+              </div>
+              <div class="requirement" id="req-number">
+                <span class="req-icon">○</span>
+                <span class="req-text">Contains a number (recommended)</span>
+              </div>
             </div>
           </div>
+          
           <div class="login-input-group">
             <label for="setup-confirm">Confirm Password</label>
             <div class="login-input-wrapper">
               <span class="input-icon">🔒</span>
-              <input type="password" id="setup-confirm" placeholder="Confirm your password" required>
+              <input type="password" id="setup-confirm" placeholder="Confirm your password" required autocomplete="new-password">
+              <button type="button" class="password-toggle" id="setup-confirm-toggle" tabindex="-1">
+                <span class="toggle-icon">👁️</span>
+              </button>
+            </div>
+            <!-- Password Match Indicator -->
+            <div class="password-match" id="setup-match" style="display:none;">
+              <span class="match-icon">○</span>
+              <span class="match-text">Passwords match</span>
             </div>
           </div>
-          <button type="submit" id="setup-btn" class="login-btn">Set Password & Continue</button>
+          
+          <button type="submit" id="setup-btn" class="login-btn" disabled>Set Password & Continue</button>
         </form>
         <div id="setup-success" class="login-error"
           style="display:none;background:var(--success-light);border-color:rgba(16,185,129,.3);color:#a7f3d0;"></div>
@@ -187,21 +223,57 @@
         </div>
         <form id="reset-password-form" class="login-form" autocomplete="off">
           <div id="reset-error" class="login-error" style="display:none;"></div>
+          
           <div class="login-input-group">
             <label for="reset-password">New Password</label>
             <div class="login-input-wrapper">
               <span class="input-icon">🔒</span>
-              <input type="password" id="reset-password" placeholder="Minimum 6 characters" required minlength="6">
+              <input type="password" id="reset-password" placeholder="Minimum 6 characters" required minlength="6" autocomplete="new-password">
+              <button type="button" class="password-toggle" id="reset-password-toggle" tabindex="-1">
+                <span class="toggle-icon">👁️</span>
+              </button>
+            </div>
+            <!-- Password Strength Indicator -->
+            <div class="password-strength" id="reset-password-strength" style="display:none;">
+              <div class="strength-bar">
+                <div class="strength-bar-fill" id="reset-strength-fill"></div>
+              </div>
+              <div class="strength-text" id="reset-strength-text">Password strength</div>
+            </div>
+            <!-- Password Requirements -->
+            <div class="password-requirements" id="reset-requirements">
+              <div class="requirement" id="reset-req-length">
+                <span class="req-icon">○</span>
+                <span class="req-text">At least 6 characters</span>
+              </div>
+              <div class="requirement" id="reset-req-letter">
+                <span class="req-icon">○</span>
+                <span class="req-text">Contains a letter</span>
+              </div>
+              <div class="requirement" id="reset-req-number">
+                <span class="req-icon">○</span>
+                <span class="req-text">Contains a number (recommended)</span>
+              </div>
             </div>
           </div>
+          
           <div class="login-input-group">
             <label for="reset-confirm">Confirm Password</label>
             <div class="login-input-wrapper">
               <span class="input-icon">🔒</span>
-              <input type="password" id="reset-confirm" placeholder="Confirm your password" required>
+              <input type="password" id="reset-confirm" placeholder="Confirm your password" required autocomplete="new-password">
+              <button type="button" class="password-toggle" id="reset-confirm-toggle" tabindex="-1">
+                <span class="toggle-icon">👁️</span>
+              </button>
+            </div>
+            <!-- Password Match Indicator -->
+            <div class="password-match" id="reset-match" style="display:none;">
+              <span class="match-icon">○</span>
+              <span class="match-text">Passwords match</span>
             </div>
           </div>
-          <button type="submit" id="reset-btn" class="login-btn">Reset Password</button>
+          
+          <button type="submit" id="reset-btn" class="login-btn" disabled>Reset Password</button>
         </form>
         <div id="reset-success" class="login-error"
           style="display:none;background:var(--success-light);border-color:rgba(16,185,129,.3);color:#a7f3d0;"></div>

@@ -139,6 +139,93 @@ async function handleForgotPassword(e) {
     }
 }
 
+// Password strength calculator
+function calculatePasswordStrength(password) {
+    let strength = 0;
+    const checks = {
+        length: password.length >= 6,
+        hasLetter: /[a-zA-Z]/.test(password),
+        hasNumber: /[0-9]/.test(password),
+        hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+        longEnough: password.length >= 8
+    };
+
+    if (checks.length) strength += 1;
+    if (checks.hasLetter) strength += 1;
+    if (checks.hasNumber) strength += 1;
+    if (checks.hasSpecial) strength += 1;
+    if (checks.longEnough) strength += 1;
+
+    // Determine strength level
+    let level = 'weak';
+    if (strength >= 4) level = 'strong';
+    else if (strength >= 3) level = 'medium';
+
+    return { level, strength, checks };
+}
+
+// Update password strength UI
+function updatePasswordStrength(passwordId, strengthId, fillId, textId, reqPrefix) {
+    const password = document.getElementById(passwordId).value;
+    const strengthEl = document.getElementById(strengthId);
+    const fillEl = document.getElementById(fillId);
+    const textEl = document.getElementById(textId);
+
+    if (!password) {
+        strengthEl.style.display = 'none';
+        return;
+    }
+
+    strengthEl.style.display = 'block';
+    const { level, checks } = calculatePasswordStrength(password);
+
+    // Update strength bar
+    fillEl.className = `strength-bar-fill ${level}`;
+    
+    // Update strength text
+    textEl.className = `strength-text ${level}`;
+    textEl.textContent = level === 'weak' ? 'Weak password' : 
+                         level === 'medium' ? 'Medium strength' : 
+                         'Strong password';
+
+    // Update requirements
+    const reqLength = document.getElementById(`${reqPrefix}-length`);
+    const reqLetter = document.getElementById(`${reqPrefix}-letter`);
+    const reqNumber = document.getElementById(`${reqPrefix}-number`);
+
+    if (reqLength) {
+        reqLength.className = checks.length ? 'requirement met' : 'requirement';
+    }
+    if (reqLetter) {
+        reqLetter.className = checks.hasLetter ? 'requirement met' : 'requirement';
+    }
+    if (reqNumber) {
+        reqNumber.className = checks.hasNumber ? 'requirement met' : 'requirement';
+    }
+
+    return { level, checks };
+}
+
+// Update password match UI
+function updatePasswordMatch(passwordId, confirmId, matchId) {
+    const password = document.getElementById(passwordId).value;
+    const confirm = document.getElementById(confirmId).value;
+    const matchEl = document.getElementById(matchId);
+
+    if (!confirm) {
+        matchEl.style.display = 'none';
+        return false;
+    }
+
+    matchEl.style.display = 'flex';
+    const matches = password === confirm;
+    
+    matchEl.className = matches ? 'password-match match' : 'password-match no-match';
+    matchEl.querySelector('.match-text').textContent = matches ? 'Passwords match' : 'Passwords do not match';
+
+    return matches;
+}
+
 // Setup password handler (for new salesperson accounts)
 async function handleSetupPassword(e) {
     e.preventDefault();
@@ -157,8 +244,17 @@ async function handleSetupPassword(e) {
         return;
     }
 
-    if (password.length < 6) {
-        errorEl.textContent = 'Password must be at least 6 characters';
+    // Check password strength
+    const { level, checks } = calculatePasswordStrength(password);
+    
+    if (!checks.length || !checks.hasLetter) {
+        errorEl.textContent = 'Password must be at least 6 characters and contain a letter';
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    if (level === 'weak') {
+        errorEl.textContent = 'Password is too weak. Please add numbers or make it longer for at least medium strength.';
         errorEl.style.display = 'block';
         return;
     }
@@ -229,8 +325,17 @@ async function handleResetPassword(e) {
         return;
     }
 
-    if (password.length < 6) {
-        errorEl.textContent = 'Password must be at least 6 characters';
+    // Check password strength
+    const { level, checks } = calculatePasswordStrength(password);
+    
+    if (!checks.length || !checks.hasLetter) {
+        errorEl.textContent = 'Password must be at least 6 characters and contain a letter';
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    if (level === 'weak') {
+        errorEl.textContent = 'Password is too weak. Please add numbers or make it longer for at least medium strength.';
         errorEl.style.display = 'block';
         return;
     }
@@ -292,11 +397,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (setupToken) {
         showView('setup');
+        // Initialize password validation for setup page
+        setTimeout(() => initSetupPasswordValidation(), 100);
         return;
     }
 
     if (resetToken) {
         showView('reset');
+        // Initialize password validation for reset page
+        setTimeout(() => initResetPasswordValidation(), 100);
         return;
     }
 
@@ -326,3 +435,138 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('login-page').style.display = 'flex';
     }
 });
+
+
+// Setup password strength and validation for setup page
+function initSetupPasswordValidation() {
+    const passwordInput = document.getElementById('setup-password');
+    const confirmInput = document.getElementById('setup-confirm');
+    const submitBtn = document.getElementById('setup-btn');
+    const passwordToggle = document.getElementById('setup-password-toggle');
+    const confirmToggle = document.getElementById('setup-confirm-toggle');
+
+    if (!passwordInput || !confirmInput) return;
+
+    // Password strength checking
+    passwordInput.addEventListener('input', () => {
+        const result = updatePasswordStrength(
+            'setup-password',
+            'setup-password-strength',
+            'setup-strength-fill',
+            'setup-strength-text',
+            'req'
+        );
+        validateSetupForm();
+    });
+
+    // Password match checking
+    confirmInput.addEventListener('input', () => {
+        updatePasswordMatch('setup-password', 'setup-confirm', 'setup-match');
+        validateSetupForm();
+    });
+
+    // Password visibility toggle
+    if (passwordToggle) {
+        passwordToggle.addEventListener('click', () => {
+            const type = passwordInput.type === 'password' ? 'text' : 'password';
+            passwordInput.type = type;
+            passwordToggle.querySelector('.toggle-icon').textContent = type === 'password' ? '👁️' : '🙈';
+        });
+    }
+
+    if (confirmToggle) {
+        confirmToggle.addEventListener('click', () => {
+            const type = confirmInput.type === 'password' ? 'text' : 'password';
+            confirmInput.type = type;
+            confirmToggle.querySelector('.toggle-icon').textContent = type === 'password' ? '👁️' : '🙈';
+        });
+    }
+
+    function validateSetupForm() {
+        const password = passwordInput.value;
+        const confirm = confirmInput.value;
+        
+        if (!password || !confirm) {
+            submitBtn.disabled = true;
+            return;
+        }
+
+        const { level, checks } = calculatePasswordStrength(password);
+        const matches = password === confirm;
+        
+        // Enable button only if password is at least medium strength and passwords match
+        const isValid = (level === 'medium' || level === 'strong') && 
+                       checks.length && 
+                       checks.hasLetter && 
+                       matches;
+        
+        submitBtn.disabled = !isValid;
+    }
+}
+
+// Setup password strength and validation for reset page
+function initResetPasswordValidation() {
+    const passwordInput = document.getElementById('reset-password');
+    const confirmInput = document.getElementById('reset-confirm');
+    const submitBtn = document.getElementById('reset-btn');
+    const passwordToggle = document.getElementById('reset-password-toggle');
+    const confirmToggle = document.getElementById('reset-confirm-toggle');
+
+    if (!passwordInput || !confirmInput) return;
+
+    // Password strength checking
+    passwordInput.addEventListener('input', () => {
+        const result = updatePasswordStrength(
+            'reset-password',
+            'reset-password-strength',
+            'reset-strength-fill',
+            'reset-strength-text',
+            'reset-req'
+        );
+        validateResetForm();
+    });
+
+    // Password match checking
+    confirmInput.addEventListener('input', () => {
+        updatePasswordMatch('reset-password', 'reset-confirm', 'reset-match');
+        validateResetForm();
+    });
+
+    // Password visibility toggle
+    if (passwordToggle) {
+        passwordToggle.addEventListener('click', () => {
+            const type = passwordInput.type === 'password' ? 'text' : 'password';
+            passwordInput.type = type;
+            passwordToggle.querySelector('.toggle-icon').textContent = type === 'password' ? '👁️' : '🙈';
+        });
+    }
+
+    if (confirmToggle) {
+        confirmToggle.addEventListener('click', () => {
+            const type = confirmInput.type === 'password' ? 'text' : 'password';
+            confirmInput.type = type;
+            confirmToggle.querySelector('.toggle-icon').textContent = type === 'password' ? '👁️' : '🙈';
+        });
+    }
+
+    function validateResetForm() {
+        const password = passwordInput.value;
+        const confirm = confirmInput.value;
+        
+        if (!password || !confirm) {
+            submitBtn.disabled = true;
+            return;
+        }
+
+        const { level, checks } = calculatePasswordStrength(password);
+        const matches = password === confirm;
+        
+        // Enable button only if password is at least medium strength and passwords match
+        const isValid = (level === 'medium' || level === 'strong') && 
+                       checks.length && 
+                       checks.hasLetter && 
+                       matches;
+        
+        submitBtn.disabled = !isValid;
+    }
+}

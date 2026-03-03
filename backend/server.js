@@ -29,7 +29,12 @@ const JWT_SECRET = process.env.JWT_SECRET || 'tap-and-pay-secret-key-2026';
 const RESEND_API_KEY = process.env.RESEND_API;
 
 // Initialize Resend
+if (!RESEND_API_KEY) {
+  console.warn('⚠️ WARNING: RESEND_API key not found in environment variables. Email functionality will not work.');
+  console.warn('⚠️ Please add RESEND_API=your_api_key to your .env file');
+}
 const resend = new Resend(RESEND_API_KEY);
+console.log(`📧 Resend initialized: ${RESEND_API_KEY ? '✅ API key found' : '❌ No API key'}`);
 
 // MongoDB Connection
 mongoose.connect(MONGO_URI)
@@ -471,7 +476,7 @@ app.post('/auth/setup-password', async (req, res) => {
   }
 });
 
-// Forgot password (for agents - generates reset token)
+// Forgot password (generates reset token and sends email)
 app.post('/auth/forgot-password', async (req, res) => {
   const { username } = req.body;
 
@@ -480,10 +485,22 @@ app.post('/auth/forgot-password', async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ username: username.toLowerCase() });
+    const user = await User.findOne({ 
+      $or: [
+        { username: username.toLowerCase() },
+        { email: username.toLowerCase() }
+      ]
+    });
+    
     if (!user) {
       // Don't reveal if user exists
-      return res.json({ success: true, message: 'If the account exists, a reset link has been generated.' });
+      return res.json({ success: true, message: 'If the account exists, a reset link has been sent to the registered email address.' });
+    }
+
+    // Check if user has email
+    if (!user.email) {
+      console.log(`⚠️ User ${user.username} has no email address. Cannot send reset link.`);
+      return res.json({ success: true, message: 'If the account exists, a reset link has been sent to the registered email address.' });
     }
 
     const crypto = require('crypto');
@@ -495,75 +512,76 @@ app.post('/auth/forgot-password', async (req, res) => {
     const resetUrl = `${req.protocol}://${req.get('host').replace(':8208', ':9208')}?reset=${resetToken}`;
 
     // Send password reset email
-    if (user.email) {
-      try {
-        await resend.emails.send({
-          from: 'TAP & PAY <tap-to-pay@aloys.work>',
-          to: [user.email],
-          subject: 'TAP & PAY - Password Reset Request',
-          html: `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <style>
-                body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 0; }
-                .container { max-width: 600px; margin: 40px auto; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
-                .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 40px 30px; text-align: center; }
-                .logo { font-size: 32px; font-weight: 800; color: white; margin: 0; letter-spacing: -0.5px; }
-                .tagline { color: rgba(255,255,255,0.9); font-size: 14px; margin: 8px 0 0 0; }
-                .content { padding: 40px 30px; }
-                .greeting { font-size: 24px; font-weight: 700; color: #f1f5f9; margin: 0 0 16px 0; }
-                .message { font-size: 16px; line-height: 1.6; color: #cbd5e1; margin: 0 0 24px 0; }
-                .info-box { background: rgba(99, 102, 241, 0.1); border-left: 4px solid #6366f1; padding: 16px; border-radius: 8px; margin: 24px 0; }
-                .info-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 4px 0; }
-                .info-value { font-size: 16px; color: #f1f5f9; font-weight: 600; margin: 0; font-family: monospace; }
-                .button { display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 600; font-size: 16px; margin: 24px 0; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4); }
-                .footer { background: #0f172a; padding: 24px 30px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1); }
-                .footer-text { font-size: 13px; color: #64748b; margin: 0; }
-                .warning { background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 12px; border-radius: 8px; margin: 16px 0; font-size: 14px; color: #fbbf24; }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <div class="header">
-                  <h1 class="logo">TAP & PAY</h1>
-                  <p class="tagline">Secure RFID Payment System</p>
+    try {
+      const emailResult = await resend.emails.send({
+        from: 'TAP & PAY <tap-to-pay@aloys.work>',
+        to: [user.email],
+        subject: 'TAP & PAY - Password Reset Request',
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 0; }
+              .container { max-width: 600px; margin: 40px auto; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+              .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 40px 30px; text-align: center; }
+              .logo { font-size: 32px; font-weight: 800; color: white; margin: 0; letter-spacing: -0.5px; }
+              .tagline { color: rgba(255,255,255,0.9); font-size: 14px; margin: 8px 0 0 0; }
+              .content { padding: 40px 30px; }
+              .greeting { font-size: 24px; font-weight: 700; color: #f1f5f9; margin: 0 0 16px 0; }
+              .message { font-size: 16px; line-height: 1.6; color: #cbd5e1; margin: 0 0 24px 0; }
+              .info-box { background: rgba(99, 102, 241, 0.1); border-left: 4px solid #6366f1; padding: 16px; border-radius: 8px; margin: 24px 0; }
+              .info-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 4px 0; }
+              .info-value { font-size: 16px; color: #f1f5f9; font-weight: 600; margin: 0; font-family: monospace; }
+              .button { display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 600; font-size: 16px; margin: 24px 0; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4); }
+              .footer { background: #0f172a; padding: 24px 30px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1); }
+              .footer-text { font-size: 13px; color: #64748b; margin: 0; }
+              .warning { background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 12px; border-radius: 8px; margin: 16px 0; font-size: 14px; color: #fbbf24; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1 class="logo">TAP & PAY</h1>
+                <p class="tagline">Secure RFID Payment System</p>
+              </div>
+              <div class="content">
+                <h2 class="greeting">Password Reset Request 🔑</h2>
+                <p class="message">
+                  Hello ${user.fullName},
+                </p>
+                <p class="message">
+                  We received a request to reset your password for your TAP & PAY account.
+                </p>
+                <div class="info-box">
+                  <p class="info-label">Username</p>
+                  <p class="info-value">${user.username}</p>
                 </div>
-                <div class="content">
-                  <h2 class="greeting">Password Reset Request 🔑</h2>
-                  <p class="message">
-                    Hello ${user.fullName},
-                  </p>
-                  <p class="message">
-                    We received a request to reset your password for your TAP & PAY account.
-                  </p>
-                  <div class="info-box">
-                    <p class="info-label">Username</p>
-                    <p class="info-value">${user.username}</p>
-                  </div>
-                  <p class="message">
-                    Click the button below to reset your password:
-                  </p>
-                  <center>
-                    <a href="${resetUrl}" class="button">Reset Password →</a>
-                  </center>
-                  <div class="warning">
-                    ⚠️ This reset link will expire in 1 hour. If you didn't request this reset, please ignore this email and your password will remain unchanged.
-                  </div>
-                </div>
-                <div class="footer">
-                  <p class="footer-text">© 2026 TAP & PAY. All rights reserved.</p>
-                  <p class="footer-text" style="margin-top: 8px;">For security reasons, never share your password with anyone.</p>
+                <p class="message">
+                  Click the button below to reset your password:
+                </p>
+                <center>
+                  <a href="${resetUrl}" class="button">Reset Password →</a>
+                </center>
+                <div class="warning">
+                  ⚠️ This reset link will expire in 1 hour. If you didn't request this reset, please ignore this email and your password will remain unchanged.
                 </div>
               </div>
-            </body>
-            </html>
-          `
-        });
-        console.log(`✅ Password reset email sent to ${user.email}`);
-      } catch (emailError) {
-        console.error('Failed to send reset email:', emailError);
-      }
+              <div class="footer">
+                <p class="footer-text">© 2026 TAP & PAY. All rights reserved.</p>
+                <p class="footer-text" style="margin-top: 8px;">For security reasons, never share your password with anyone.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `
+      });
+      console.log(`✅ Password reset email sent to ${user.email}`);
+      console.log(`📧 Email ID: ${emailResult.id}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send reset email:', emailError);
+      console.error('Error details:', emailError.message);
+      // Continue anyway - don't reveal email sending failure to user
     }
 
     console.log(`\n🔑 RESET LINK for ${user.fullName} (${user.username}):\n${resetUrl}\n`);
@@ -645,6 +663,62 @@ app.delete('/auth/users/:id', authenticateToken, requireRole('agent'), async (re
 // Verify token
 app.get('/auth/verify', authenticateToken, (req, res) => {
   res.json({ valid: true, user: req.user });
+});
+
+// Test email endpoint (for debugging)
+app.post('/auth/test-email', authenticateToken, requireRole('agent'), async (req, res) => {
+  const { email } = req.body;
+  
+  if (!email) {
+    return res.status(400).json({ error: 'Email address required' });
+  }
+
+  if (!RESEND_API_KEY) {
+    return res.status(500).json({ error: 'Resend API key not configured' });
+  }
+
+  try {
+    const result = await resend.emails.send({
+      from: 'TAP & PAY <tap-to-pay@aloys.work>',
+      to: [email],
+      subject: 'TAP & PAY - Test Email',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+            .container { max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; }
+            h1 { color: #6366f1; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>✅ Email Test Successful!</h1>
+            <p>This is a test email from TAP & PAY system.</p>
+            <p>If you received this, your Resend integration is working correctly.</p>
+            <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
+          </div>
+        </body>
+        </html>
+      `
+    });
+    
+    console.log(`✅ Test email sent to ${email}`);
+    console.log(`📧 Email ID: ${result.id}`);
+    
+    res.json({ 
+      success: true, 
+      message: `Test email sent to ${email}`,
+      emailId: result.id
+    });
+  } catch (error) {
+    console.error('❌ Test email failed:', error);
+    res.status(500).json({ 
+      error: 'Failed to send test email',
+      details: error.message 
+    });
+  }
 });
 
 // ==================== CARD ENDPOINTS ====================
