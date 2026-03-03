@@ -5,6 +5,8 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const { Resend } = require('resend');
 require('dotenv').config();
 
 const app = express();
@@ -12,7 +14,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
   }
 });
 
@@ -23,35 +25,53 @@ const PORT = 8208;
 const TEAM_ID = "team_rdf";
 const MQTT_BROKER = "mqtt://157.173.101.159:1883";
 const MONGO_URI = process.env.MONGODB_URI;
+const JWT_SECRET = process.env.JWT_SECRET || 'tap-and-pay-secret-key-2026';
+const RESEND_API_KEY = process.env.RESEND_API;
+
+// Initialize Resend
+const resend = new Resend(RESEND_API_KEY);
 
 // MongoDB Connection
 mongoose.connect(MONGO_URI)
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
+// ==================== SCHEMAS ====================
+
+// User Schema (for authentication)
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  password: { type: String, default: null },
+  fullName: { type: String, required: true },
+  email: { type: String, default: '' },
+  role: { type: String, enum: ['agent', 'salesperson'], required: true },
+  passwordSet: { type: Boolean, default: false },
+  setupToken: { type: String, default: null },
+  setupTokenExpiry: { type: Date, default: null },
+  resetToken: { type: String, default: null },
+  resetTokenExpiry: { type: Date, default: null },
+  createdAt: { type: Date, default: Date.now },
+  lastLogin: { type: Date, default: null }
+});
+
+const User = mongoose.model('User', userSchema);
+
 // Card Schema
 const cardSchema = new mongoose.Schema({
   uid: { type: String, required: true, unique: true },
   holderName: { type: String, required: true },
+  email: { type: String, default: '' },
+  phone: { type: String, default: '' },
   balance: { type: Number, default: 0 },
   lastTopup: { type: Number, default: 0 },
-  passcode: { type: String, default: null }, // 6-digit passcode (hashed)
+  passcode: { type: String, default: null },
   passcodeSet: { type: Boolean, default: false },
+  status: { type: String, enum: ['active', 'suspended', 'blocked'], default: 'active' },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
 
 const Card = mongoose.model('Card', cardSchema);
-
-// Passcode helper functions
-async function hashPasscode(passcode) {
-  const saltRounds = 10;
-  return await bcrypt.hash(passcode, saltRounds);
-}
-
-async function verifyPasscode(inputPasscode, hashedPasscode) {
-  return await bcrypt.compare(inputPasscode, hashedPasscode);
-}
 
 // Transaction Schema
 const transactionSchema = new mongoose.Schema({
@@ -62,10 +82,73 @@ const transactionSchema = new mongoose.Schema({
   balanceBefore: { type: Number, required: true },
   balanceAfter: { type: Number, required: true },
   description: { type: String },
+  items: { type: Array, default: [] },
+  processedBy: { type: String, default: 'system' },
+  receiptId: { type: String, default: null },
   timestamp: { type: Date, default: Date.now }
 });
 
 const Transaction = mongoose.model('Transaction', transactionSchema);
+
+// System Settings Schema
+const settingsSchema = new mongoose.Schema({
+  key: { type: String, required: true, unique: true },
+  value: { type: mongoose.Schema.Types.Mixed, required: true },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const Settings = mongoose.model('Settings', settingsSchema);
+
+// ==================== HELPERS ====================
+
+async function hashPassword(password) {
+  const saltRounds = 10;
+  return await bcrypt.hash(password, saltRounds);
+}
+
+async function verifyPassword(input, hashed) {
+  return await bcrypt.compare(input, hashed);
+}
+
+async function hashPasscode(passcode) {
+  const saltRounds = 10;
+  return await bcrypt.hash(passcode, saltRounds);
+}
+
+async function verifyPasscode(inputPasscode, hashedPasscode) {
+  return await bcrypt.compare(inputPasscode, hashedPasscode);
+}
+
+function generateReceiptId() {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `RCP-${timestamp}-${random}`;
+}
+
+// JWT Middleware
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: 'Invalid or expired token' });
+    req.user = user;
+    next();
+  });
+}
+
+function requireRole(role) {
+  return (req, res, next) => {
+    if (req.user.role !== role) {
+      return res.status(403).json({ error: `Access denied. ${role} role required.` });
+    }
+    next();
+  };
+}
 
 // Product catalog with categories
 const PRODUCTS = [
@@ -76,9 +159,10 @@ const PRODUCTS = [
   { id: 'snack', name: 'Snack Pack', price: 3.00, icon: '🍿', category: 'food' },
   { id: 'juice', name: 'Fresh Juice', price: 3.50, icon: '🧃', category: 'food' },
   { id: 'salad', name: 'Salad Bowl', price: 6.00, icon: '🥗', category: 'food' },
-  
+  { id: 'chips', name: 'Chips', price: 2.50, icon: '🍟', category: 'food' },
+
   // Rwandan Local Foods
-  { id: 'brochette', name: 'Brochette', price: 4.00, icon: '�串', category: 'rwandan' },
+  { id: 'brochette', name: 'Brochette', price: 4.00, icon: '🍢', category: 'rwandan' },
   { id: 'isombe', name: 'Isombe', price: 3.50, icon: '🥬', category: 'rwandan' },
   { id: 'ubugari', name: 'Ubugari', price: 2.00, icon: '🍚', category: 'rwandan' },
   { id: 'sambaza', name: 'Sambaza (Fried)', price: 3.00, icon: '🐟', category: 'rwandan' },
@@ -86,14 +170,13 @@ const PRODUCTS = [
   { id: 'ikivuguto', name: 'Ikivuguto (Yogurt)', price: 1.50, icon: '🥛', category: 'rwandan' },
   { id: 'agatogo', name: 'Agatogo', price: 4.50, icon: '🍲', category: 'rwandan' },
   { id: 'urwagwa', name: 'Urwagwa (Banana Beer)', price: 2.50, icon: '🍺', category: 'rwandan' },
-  
+
   // Snacks & Drinks
   { id: 'fanta', name: 'Fanta', price: 1.20, icon: '🥤', category: 'drinks' },
   { id: 'primus', name: 'Primus Beer', price: 2.00, icon: '🍺', category: 'drinks' },
   { id: 'mutzig', name: 'Mutzig Beer', price: 2.00, icon: '🍺', category: 'drinks' },
   { id: 'inyange-juice', name: 'Inyange Juice', price: 1.50, icon: '🧃', category: 'drinks' },
-  { id: 'chips', name: 'Chips', price: 2.50, icon: '🍟', category: 'food' },
-  
+
   // Domain Registration Services
   { id: 'domain-com', name: '.com Domain', price: 12.00, icon: '🌐', category: 'domains' },
   { id: 'domain-net', name: '.net Domain', price: 11.00, icon: '🌐', category: 'domains' },
@@ -105,7 +188,7 @@ const PRODUCTS = [
   { id: 'domain-xyz', name: '.xyz Domain', price: 8.00, icon: '🌐', category: 'domains' },
   { id: 'domain-co', name: '.co Domain', price: 25.00, icon: '🌐', category: 'domains' },
   { id: 'domain-rw', name: '.rw Domain', price: 20.00, icon: '🇷🇼', category: 'domains' },
-  
+
   // Digital Services
   { id: 'hosting-basic', name: 'Basic Hosting (1mo)', price: 5.00, icon: '☁️', category: 'services' },
   { id: 'hosting-pro', name: 'Pro Hosting (1mo)', price: 15.00, icon: '☁️', category: 'services' },
@@ -113,14 +196,14 @@ const PRODUCTS = [
   { id: 'email-pro', name: 'Professional Email', price: 8.00, icon: '📧', category: 'services' }
 ];
 
-// Topics
+// ==================== MQTT ====================
+
 const TOPIC_STATUS = `rfid/${TEAM_ID}/card/status`;
 const TOPIC_BALANCE = `rfid/${TEAM_ID}/card/balance`;
 const TOPIC_TOPUP = `rfid/${TEAM_ID}/card/topup`;
 const TOPIC_PAYMENT = `rfid/${TEAM_ID}/card/payment`;
 const TOPIC_REMOVED = `rfid/${TEAM_ID}/card/removed`;
 
-// MQTT Client Setup
 const mqttClient = mqtt.connect(MQTT_BROKER);
 
 mqttClient.on('connect', () => {
@@ -150,16 +233,431 @@ mqttClient.on('message', (topic, message) => {
   }
 });
 
-// HTTP Endpoints
+// ==================== AUTH ENDPOINTS ====================
+
+// Login
+app.post('/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username/email and password are required' });
+  }
+
+  try {
+    // Try to find user by username or email
+    const user = await User.findOne({
+      $or: [
+        { username: username.toLowerCase() },
+        { email: username.toLowerCase() }
+      ]
+    });
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid username/email or password' });
+    }
+
+    // Check if password has been set
+    if (!user.passwordSet || !user.password) {
+      return res.status(403).json({ 
+        error: 'Password not set. Please use your setup link to set your password.',
+        needsSetup: true,
+        setupRequired: true
+      });
+    }
+
+    const isValid = await verifyPassword(password, user.password);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid username/email or password' });
+    }
+
+    // Update last login
+    user.lastLogin = Date.now();
+    await user.save();
+
+    // Generate JWT
+    const token = jwt.sign(
+      { id: user._id, username: user.username, fullName: user.fullName, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        fullName: user.fullName,
+        role: user.role,
+        lastLogin: user.lastLogin
+      }
+    });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Register new salesperson (agent creates by name + email, generates setup token)
+app.post('/auth/register', authenticateToken, requireRole('agent'), async (req, res) => {
+  const { fullName, email } = req.body;
+
+  if (!fullName || !email) {
+    return res.status(400).json({ error: 'Full name and email are required' });
+  }
+
+  // Generate username from email (part before @)
+  let username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  try {
+    // Check if email already exists
+    const existingEmail = await User.findOne({ email: email.toLowerCase() });
+    if (existingEmail) {
+      return res.status(400).json({ error: 'A user with this email already exists' });
+    }
+
+    // Ensure unique username
+    let existing = await User.findOne({ username });
+    let counter = 1;
+    while (existing) {
+      username = `${email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '')}${counter}`;
+      existing = await User.findOne({ username });
+      counter++;
+    }
+
+    // Generate setup token (valid for 72 hours)
+    const crypto = require('crypto');
+    const setupToken = crypto.randomBytes(32).toString('hex');
+    const setupTokenExpiry = new Date(Date.now() + 72 * 60 * 60 * 1000);
+
+    const user = new User({
+      username,
+      fullName,
+      email: email.toLowerCase(),
+      role: 'salesperson',
+      passwordSet: false,
+      setupToken,
+      setupTokenExpiry
+    });
+
+    await user.save();
+
+    // Build setup URL
+    const setupUrl = `${req.protocol}://${req.get('host').replace(':8208', ':9208')}?setup=${setupToken}`;
+
+    // Send email via Resend
+    try {
+      await resend.emails.send({
+        from: 'TAP & PAY <tap-to-pay@aloys.work>',
+        to: [email.toLowerCase()],
+        subject: 'Welcome to TAP & PAY - Complete Your Account Setup',
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 0; }
+              .container { max-width: 600px; margin: 40px auto; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+              .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 40px 30px; text-align: center; }
+              .logo { font-size: 32px; font-weight: 800; color: white; margin: 0; letter-spacing: -0.5px; }
+              .tagline { color: rgba(255,255,255,0.9); font-size: 14px; margin: 8px 0 0 0; }
+              .content { padding: 40px 30px; }
+              .greeting { font-size: 24px; font-weight: 700; color: #f1f5f9; margin: 0 0 16px 0; }
+              .message { font-size: 16px; line-height: 1.6; color: #cbd5e1; margin: 0 0 24px 0; }
+              .info-box { background: rgba(99, 102, 241, 0.1); border-left: 4px solid #6366f1; padding: 16px; border-radius: 8px; margin: 24px 0; }
+              .info-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 4px 0; }
+              .info-value { font-size: 16px; color: #f1f5f9; font-weight: 600; margin: 0; font-family: monospace; }
+              .button { display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 600; font-size: 16px; margin: 24px 0; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4); }
+              .button:hover { box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6); }
+              .footer { background: #0f172a; padding: 24px 30px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1); }
+              .footer-text { font-size: 13px; color: #64748b; margin: 0; }
+              .warning { background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 12px; border-radius: 8px; margin: 16px 0; font-size: 14px; color: #fbbf24; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1 class="logo">TAP & PAY</h1>
+                <p class="tagline">Secure RFID Payment System</p>
+              </div>
+              <div class="content">
+                <h2 class="greeting">Welcome, ${fullName}! 👋</h2>
+                <p class="message">
+                  Your TAP & PAY salesperson account has been created by an agent. To get started, you need to complete your account setup by creating a secure password.
+                </p>
+                <div class="info-box">
+                  <p class="info-label">Your Username</p>
+                  <p class="info-value">${username}</p>
+                </div>
+                <p class="message">
+                  Click the button below to set your password and activate your account:
+                </p>
+                <center>
+                  <a href="${setupUrl}" class="button">Complete Account Setup →</a>
+                </center>
+                <div class="warning">
+                  ⚠️ This setup link will expire in 72 hours. If it expires, please contact your agent to generate a new one.
+                </div>
+                <p class="message" style="font-size: 14px; color: #94a3b8; margin-top: 32px;">
+                  After setting your password, you'll be able to log in and start processing payments using your RFID card reader.
+                </p>
+              </div>
+              <div class="footer">
+                <p class="footer-text">© 2026 TAP & PAY. All rights reserved.</p>
+                <p class="footer-text" style="margin-top: 8px;">If you didn't request this account, please ignore this email.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `
+      });
+      console.log(`✅ Setup email sent to ${email}`);
+    } catch (emailError) {
+      console.error('Failed to send email:', emailError);
+      // Continue even if email fails - return the link
+    }
+
+    console.log(`\n📧 SETUP LINK for ${fullName} (${email}):\n${setupUrl}\n`);
+
+    res.json({ 
+      success: true, 
+      message: `Salesperson ${fullName} created. Setup email sent to ${email}.`,
+      setupUrl,
+      username,
+      email: email.toLowerCase()
+    });
+  } catch (err) {
+    console.error('Register error:', err);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// Setup password (salesperson first login via token)
+app.post('/auth/setup-password', async (req, res) => {
+  const { token, password } = req.body;
+
+  if (!token || !password) {
+    return res.status(400).json({ error: 'Token and password are required' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+
+  try {
+    const user = await User.findOne({ 
+      setupToken: token, 
+      setupTokenExpiry: { $gt: new Date() } 
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired setup link. Please contact your agent.' });
+    }
+
+    user.password = await hashPassword(password);
+    user.passwordSet = true;
+    user.setupToken = null;
+    user.setupTokenExpiry = null;
+    await user.save();
+
+    res.json({ 
+      success: true, 
+      message: 'Password set successfully! You can now log in.',
+      username: user.username
+    });
+  } catch (err) {
+    console.error('Setup password error:', err);
+    res.status(500).json({ error: 'Failed to set password' });
+  }
+});
+
+// Forgot password (for agents - generates reset token)
+app.post('/auth/forgot-password', async (req, res) => {
+  const { username } = req.body;
+
+  if (!username) {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+
+  try {
+    const user = await User.findOne({ username: username.toLowerCase() });
+    if (!user) {
+      // Don't reveal if user exists
+      return res.json({ success: true, message: 'If the account exists, a reset link has been generated.' });
+    }
+
+    const crypto = require('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.resetToken = resetToken;
+    user.resetTokenExpiry = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
+    await user.save();
+
+    const resetUrl = `${req.protocol}://${req.get('host').replace(':8208', ':9208')}?reset=${resetToken}`;
+
+    // Send password reset email
+    if (user.email) {
+      try {
+        await resend.emails.send({
+          from: 'TAP & PAY <tap-to-pay@aloys.work>',
+          to: [user.email],
+          subject: 'TAP & PAY - Password Reset Request',
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 0; }
+                .container { max-width: 600px; margin: 40px auto; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+                .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 40px 30px; text-align: center; }
+                .logo { font-size: 32px; font-weight: 800; color: white; margin: 0; letter-spacing: -0.5px; }
+                .tagline { color: rgba(255,255,255,0.9); font-size: 14px; margin: 8px 0 0 0; }
+                .content { padding: 40px 30px; }
+                .greeting { font-size: 24px; font-weight: 700; color: #f1f5f9; margin: 0 0 16px 0; }
+                .message { font-size: 16px; line-height: 1.6; color: #cbd5e1; margin: 0 0 24px 0; }
+                .info-box { background: rgba(99, 102, 241, 0.1); border-left: 4px solid #6366f1; padding: 16px; border-radius: 8px; margin: 24px 0; }
+                .info-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 4px 0; }
+                .info-value { font-size: 16px; color: #f1f5f9; font-weight: 600; margin: 0; font-family: monospace; }
+                .button { display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 600; font-size: 16px; margin: 24px 0; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4); }
+                .footer { background: #0f172a; padding: 24px 30px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1); }
+                .footer-text { font-size: 13px; color: #64748b; margin: 0; }
+                .warning { background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 12px; border-radius: 8px; margin: 16px 0; font-size: 14px; color: #fbbf24; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h1 class="logo">TAP & PAY</h1>
+                  <p class="tagline">Secure RFID Payment System</p>
+                </div>
+                <div class="content">
+                  <h2 class="greeting">Password Reset Request 🔑</h2>
+                  <p class="message">
+                    Hello ${user.fullName},
+                  </p>
+                  <p class="message">
+                    We received a request to reset your password for your TAP & PAY account.
+                  </p>
+                  <div class="info-box">
+                    <p class="info-label">Username</p>
+                    <p class="info-value">${user.username}</p>
+                  </div>
+                  <p class="message">
+                    Click the button below to reset your password:
+                  </p>
+                  <center>
+                    <a href="${resetUrl}" class="button">Reset Password →</a>
+                  </center>
+                  <div class="warning">
+                    ⚠️ This reset link will expire in 1 hour. If you didn't request this reset, please ignore this email and your password will remain unchanged.
+                  </div>
+                </div>
+                <div class="footer">
+                  <p class="footer-text">© 2026 TAP & PAY. All rights reserved.</p>
+                  <p class="footer-text" style="margin-top: 8px;">For security reasons, never share your password with anyone.</p>
+                </div>
+              </div>
+            </body>
+            </html>
+          `
+        });
+        console.log(`✅ Password reset email sent to ${user.email}`);
+      } catch (emailError) {
+        console.error('Failed to send reset email:', emailError);
+      }
+    }
+
+    console.log(`\n🔑 RESET LINK for ${user.fullName} (${user.username}):\n${resetUrl}\n`);
+
+    res.json({ 
+      success: true, 
+      message: 'If the account exists, a reset link has been sent to the registered email address.'
+    });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({ error: 'Failed to process request' });
+  }
+});
+
+// Reset password (using token)
+app.post('/auth/reset-password', async (req, res) => {
+  const { token, password } = req.body;
+
+  if (!token || !password) {
+    return res.status(400).json({ error: 'Token and new password are required' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+
+  try {
+    const user = await User.findOne({ 
+      resetToken: token, 
+      resetTokenExpiry: { $gt: new Date() } 
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired reset link.' });
+    }
+
+    user.password = await hashPassword(password);
+    user.passwordSet = true;
+    user.resetToken = null;
+    user.resetTokenExpiry = null;
+    await user.save();
+
+    res.json({ success: true, message: 'Password reset successfully! You can now log in.', username: user.username });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
+// Get all users (agent only)
+app.get('/auth/users', authenticateToken, requireRole('agent'), async (req, res) => {
+  try {
+    const users = await User.find({}, '-password -setupToken -resetToken').sort({ createdAt: -1 });
+    res.json(users);
+  } catch (err) {
+    console.error('Get users error:', err);
+    res.status(500).json({ error: 'Failed to get users' });
+  }
+});
+
+// Delete user (agent only)
+app.delete('/auth/users/:id', authenticateToken, requireRole('agent'), async (req, res) => {
+  try {
+    if (req.params.id === req.user.id) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+    const user = await User.findById(req.params.id);
+    if (user && user.role === 'agent') {
+      return res.status(400).json({ error: 'Cannot delete agent accounts. Agents are system-seeded.' });
+    }
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'User deleted successfully' });
+  } catch (err) {
+    console.error('Delete user error:', err);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+// Verify token
+app.get('/auth/verify', authenticateToken, (req, res) => {
+  res.json({ valid: true, user: req.user });
+});
+
+// ==================== CARD ENDPOINTS ====================
+
+// Top up
 app.post('/topup', async (req, res) => {
-  const { uid, amount, holderName, passcode } = req.body;
+  const { uid, amount, holderName, passcode, email, phone } = req.body;
 
   if (!uid || amount === undefined) {
     return res.status(400).json({ error: 'UID and amount are required' });
   }
 
   try {
-    // Find or create card
     let card = await Card.findOne({ uid });
     const balanceBefore = card ? card.balance : 0;
 
@@ -167,25 +665,24 @@ app.post('/topup', async (req, res) => {
       if (!holderName) {
         return res.status(400).json({ error: 'Holder name is required for new cards' });
       }
-      
-      // For new cards, passcode is required
+
       if (!passcode || !/^\d{6}$/.test(passcode)) {
         return res.status(400).json({ error: 'A 6-digit passcode is required for new cards' });
       }
-      
-      // Hash the passcode
+
       const hashedPasscode = await hashPasscode(passcode);
-      
-      card = new Card({ 
-        uid, 
-        holderName, 
-        balance: amount, 
+
+      card = new Card({
+        uid,
+        holderName,
+        balance: amount,
         lastTopup: amount,
         passcode: hashedPasscode,
-        passcodeSet: true
+        passcodeSet: true,
+        email: email || '',
+        phone: phone || ''
       });
     } else {
-      // Cumulative topup: add to existing balance
       card.balance += amount;
       card.lastTopup = amount;
       card.updatedAt = Date.now();
@@ -193,7 +690,6 @@ app.post('/topup', async (req, res) => {
 
     await card.save();
 
-    // Create transaction record
     const transaction = new Transaction({
       uid: card.uid,
       holderName: card.holderName,
@@ -201,16 +697,16 @@ app.post('/topup', async (req, res) => {
       amount: amount,
       balanceBefore: balanceBefore,
       balanceAfter: card.balance,
-      description: `Top-up of $${amount.toFixed(2)}`
+      description: `Top-up of $${amount.toFixed(2)}`,
+      processedBy: req.body.processedBy || 'system'
     });
     await transaction.save();
 
-    // Publish to MQTT with updated balance
+    // Publish to MQTT
     const payload = JSON.stringify({ uid, amount: card.balance });
     mqttClient.publish(TOPIC_TOPUP, payload, (err) => {
       if (err) {
         console.error('Failed to publish topup:', err);
-        return res.status(500).json({ error: 'Failed to publish topup command' });
       }
       console.log(`Published topup for ${uid} (${card.holderName}): ${card.balance}`);
     });
@@ -222,7 +718,9 @@ app.post('/topup', async (req, res) => {
         uid: card.uid,
         holderName: card.holderName,
         balance: card.balance,
-        lastTopup: card.lastTopup
+        lastTopup: card.lastTopup,
+        email: card.email,
+        phone: card.phone
       },
       transaction: {
         id: transaction._id,
@@ -237,46 +735,64 @@ app.post('/topup', async (req, res) => {
   }
 });
 
-// Payment / Debit endpoint
+// Payment / Debit endpoint with atomic rollback
 app.post('/pay', async (req, res) => {
-  const { uid, productId, amount, description, passcode } = req.body;
+  const { uid, productId, amount, description, passcode, items, processedBy } = req.body;
 
   if (!uid || (!productId && amount === undefined)) {
     return res.status(400).json({ error: 'UID and product or amount are required' });
   }
 
+  // Use MongoDB session for atomic transaction
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    // Find card first to check passcode requirement
-    const card = await Card.findOne({ uid });
+    const card = await Card.findOne({ uid }).session(session);
     if (!card) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ error: 'Card not found. Please top up first.' });
     }
-    
+
+    // Check card status
+    if (card.status !== 'active') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(403).json({ error: `Card is ${card.status}. Contact an agent.` });
+    }
+
     // Verify passcode if set
     if (card.passcodeSet) {
       if (!passcode) {
-        return res.status(401).json({ 
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(401).json({
           error: 'Passcode required for this card',
           passcodeRequired: true
         });
       }
-      
+
       const isValid = await verifyPasscode(passcode, card.passcode);
       if (!isValid) {
-        return res.status(401).json({ 
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(401).json({
           error: 'Incorrect passcode',
           passcodeRequired: true
         });
       }
     }
-    
-    // Resolve amount from product catalog or use direct amount
+
+    // Resolve amount
     let payAmount = amount;
     let payDescription = description || 'Payment';
 
     if (productId) {
       const product = PRODUCTS.find(p => p.id === productId);
       if (!product) {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(400).json({ error: 'Invalid product ID' });
       }
       payAmount = product.price;
@@ -284,25 +800,31 @@ app.post('/pay', async (req, res) => {
     }
 
     if (!payAmount || payAmount <= 0) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ error: 'Invalid payment amount' });
     }
 
-    // Check sufficient balance
+    // Check sufficient balance - ATOMIC CHECK
     if (card.balance < payAmount) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({
-        error: 'Insufficient balance',
+        error: 'Insufficient balance. Transaction rolled back.',
         currentBalance: card.balance,
         required: payAmount,
-        shortfall: payAmount - card.balance
+        shortfall: payAmount - card.balance,
+        rolledBack: true
       });
     }
 
     const balanceBefore = card.balance;
+    const receiptId = generateReceiptId();
 
-    // Deduct amount
+    // Deduct amount atomically
     card.balance -= payAmount;
     card.updatedAt = Date.now();
-    await card.save();
+    await card.save({ session });
 
     // Create transaction record
     const transaction = new Transaction({
@@ -312,26 +834,31 @@ app.post('/pay', async (req, res) => {
       amount: payAmount,
       balanceBefore: balanceBefore,
       balanceAfter: card.balance,
-      description: payDescription
+      description: payDescription,
+      items: items || [],
+      processedBy: processedBy || 'system',
+      receiptId: receiptId
     });
-    await transaction.save();
+    await transaction.save({ session });
 
-    // Publish to MQTT so ESP8266 updates
-    const payload = JSON.stringify({
+    // Commit the transaction
+    await session.commitTransaction();
+    session.endSession();
+
+    // Publish to MQTT
+    const mqttPayload = JSON.stringify({
       uid,
       amount: card.balance,
       deducted: payAmount,
       description: payDescription,
       status: 'success'
     });
-    mqttClient.publish(TOPIC_PAYMENT, payload, (err) => {
-      if (err) {
-        console.error('Failed to publish payment:', err);
-      }
+    mqttClient.publish(TOPIC_PAYMENT, mqttPayload, (err) => {
+      if (err) console.error('Failed to publish payment:', err);
       console.log(`Published payment for ${uid} (${card.holderName}): -$${payAmount.toFixed(2)}, balance: $${card.balance.toFixed(2)}`);
     });
 
-    // Emit real-time update via WebSocket
+    // Emit real-time update
     io.emit('payment-success', {
       uid: card.uid,
       holderName: card.holderName,
@@ -339,6 +866,7 @@ app.post('/pay', async (req, res) => {
       balanceBefore,
       balanceAfter: card.balance,
       description: payDescription,
+      receiptId: receiptId,
       timestamp: transaction.timestamp
     });
 
@@ -357,131 +885,23 @@ app.post('/pay', async (req, res) => {
         balanceBefore,
         balanceAfter: card.balance,
         description: payDescription,
+        receiptId: receiptId,
+        items: items || [],
         timestamp: transaction.timestamp
       }
     });
   } catch (err) {
-    console.error('Payment error:', err);
-    res.status(500).json({ error: 'Payment processing failed' });
+    // ROLLBACK on any error
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Payment error (rolled back):', err);
+    res.status(500).json({ error: 'Payment processing failed. Transaction rolled back.', rolledBack: true });
   }
 });
 
 // Products catalog endpoint
 app.get('/products', (req, res) => {
   res.json(PRODUCTS);
-});
-
-// Set passcode for a card
-app.post('/card/:uid/set-passcode', async (req, res) => {
-  const { passcode } = req.body;
-  
-  if (!passcode || !/^\d{6}$/.test(passcode)) {
-    return res.status(400).json({ error: 'Passcode must be exactly 6 digits' });
-  }
-  
-  try {
-    const card = await Card.findOne({ uid: req.params.uid });
-    if (!card) {
-      return res.status(404).json({ error: 'Card not found' });
-    }
-    
-    if (card.passcodeSet) {
-      return res.status(400).json({ error: 'Passcode already set. Use change-passcode endpoint to update.' });
-    }
-    
-    card.passcode = await hashPasscode(passcode);
-    card.passcodeSet = true;
-    card.updatedAt = Date.now();
-    await card.save();
-    
-    res.json({ 
-      success: true, 
-      message: 'Passcode set successfully',
-      passcodeSet: true
-    });
-  } catch (err) {
-    console.error('Set passcode error:', err);
-    res.status(500).json({ error: 'Failed to set passcode' });
-  }
-});
-
-// Change passcode (requires old passcode)
-app.post('/card/:uid/change-passcode', async (req, res) => {
-  const { oldPasscode, newPasscode } = req.body;
-  
-  if (!oldPasscode || !newPasscode) {
-    return res.status(400).json({ error: 'Both old and new passcodes are required' });
-  }
-  
-  if (!/^\d{6}$/.test(newPasscode)) {
-    return res.status(400).json({ error: 'New passcode must be exactly 6 digits' });
-  }
-  
-  try {
-    const card = await Card.findOne({ uid: req.params.uid });
-    if (!card) {
-      return res.status(404).json({ error: 'Card not found' });
-    }
-    
-    if (!card.passcodeSet) {
-      return res.status(400).json({ error: 'No passcode set. Use set-passcode endpoint first.' });
-    }
-    
-    const isValid = await verifyPasscode(oldPasscode, card.passcode);
-    if (!isValid) {
-      return res.status(401).json({ error: 'Incorrect old passcode' });
-    }
-    
-    card.passcode = await hashPasscode(newPasscode);
-    card.updatedAt = Date.now();
-    await card.save();
-    
-    res.json({ 
-      success: true, 
-      message: 'Passcode changed successfully'
-    });
-  } catch (err) {
-    console.error('Change passcode error:', err);
-    res.status(500).json({ error: 'Failed to change passcode' });
-  }
-});
-
-// Verify passcode
-app.post('/card/:uid/verify-passcode', async (req, res) => {
-  const { passcode } = req.body;
-  
-  if (!passcode || !/^\d{6}$/.test(passcode)) {
-    return res.status(400).json({ error: 'Passcode must be exactly 6 digits', valid: false });
-  }
-  
-  try {
-    const card = await Card.findOne({ uid: req.params.uid });
-    if (!card) {
-      return res.status(404).json({ error: 'Card not found', valid: false });
-    }
-    
-    if (!card.passcodeSet) {
-      return res.status(400).json({ error: 'No passcode set for this card', valid: false });
-    }
-    
-    const isValid = await verifyPasscode(passcode, card.passcode);
-    
-    if (isValid) {
-      res.json({ 
-        success: true, 
-        valid: true,
-        message: 'Passcode verified'
-      });
-    } else {
-      res.status(401).json({ 
-        error: 'Incorrect passcode', 
-        valid: false 
-      });
-    }
-  } catch (err) {
-    console.error('Verify passcode error:', err);
-    res.status(500).json({ error: 'Failed to verify passcode', valid: false });
-  }
 });
 
 // Get card details
@@ -498,6 +918,62 @@ app.get('/card/:uid', async (req, res) => {
   }
 });
 
+// Update card (agent only)
+app.put('/card/:uid', authenticateToken, requireRole('agent'), async (req, res) => {
+  const { holderName, email, phone, status, balance } = req.body;
+
+  try {
+    const card = await Card.findOne({ uid: req.params.uid });
+    if (!card) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+
+    if (holderName !== undefined) card.holderName = holderName;
+    if (email !== undefined) card.email = email;
+    if (phone !== undefined) card.phone = phone;
+    if (status !== undefined) card.status = status;
+    if (balance !== undefined) {
+      const oldBalance = card.balance;
+      card.balance = balance;
+
+      // Record the balance adjustment as a transaction
+      if (balance !== oldBalance) {
+        const adjustType = balance > oldBalance ? 'topup' : 'debit';
+        const adjustAmount = Math.abs(balance - oldBalance);
+        const transaction = new Transaction({
+          uid: card.uid,
+          holderName: card.holderName,
+          type: adjustType,
+          amount: adjustAmount,
+          balanceBefore: oldBalance,
+          balanceAfter: balance,
+          description: `Agent adjustment: Balance ${adjustType === 'topup' ? 'increased' : 'decreased'} by $${adjustAmount.toFixed(2)}`,
+          processedBy: req.user.username
+        });
+        await transaction.save();
+      }
+    }
+    card.updatedAt = Date.now();
+    await card.save();
+
+    res.json({ success: true, message: 'Card updated', card });
+  } catch (err) {
+    console.error('Update card error:', err);
+    res.status(500).json({ error: 'Failed to update card' });
+  }
+});
+
+// Delete card (agent only)
+app.delete('/card/:uid', authenticateToken, requireRole('agent'), async (req, res) => {
+  try {
+    await Card.findOneAndDelete({ uid: req.params.uid });
+    res.json({ success: true, message: 'Card deleted successfully' });
+  } catch (err) {
+    console.error('Delete card error:', err);
+    res.status(500).json({ error: 'Failed to delete card' });
+  }
+});
+
 // Get all cards
 app.get('/cards', async (req, res) => {
   try {
@@ -509,12 +985,103 @@ app.get('/cards', async (req, res) => {
   }
 });
 
-// Get transaction history for a specific card
+// Set passcode
+app.post('/card/:uid/set-passcode', async (req, res) => {
+  const { passcode } = req.body;
+
+  if (!passcode || !/^\d{6}$/.test(passcode)) {
+    return res.status(400).json({ error: 'Passcode must be exactly 6 digits' });
+  }
+
+  try {
+    const card = await Card.findOne({ uid: req.params.uid });
+    if (!card) return res.status(404).json({ error: 'Card not found' });
+
+    if (card.passcodeSet) {
+      return res.status(400).json({ error: 'Passcode already set. Use change-passcode endpoint.' });
+    }
+
+    card.passcode = await hashPasscode(passcode);
+    card.passcodeSet = true;
+    card.updatedAt = Date.now();
+    await card.save();
+
+    res.json({ success: true, message: 'Passcode set successfully', passcodeSet: true });
+  } catch (err) {
+    console.error('Set passcode error:', err);
+    res.status(500).json({ error: 'Failed to set passcode' });
+  }
+});
+
+// Change passcode
+app.post('/card/:uid/change-passcode', async (req, res) => {
+  const { oldPasscode, newPasscode } = req.body;
+
+  if (!oldPasscode || !newPasscode) {
+    return res.status(400).json({ error: 'Both old and new passcodes are required' });
+  }
+
+  if (!/^\d{6}$/.test(newPasscode)) {
+    return res.status(400).json({ error: 'New passcode must be exactly 6 digits' });
+  }
+
+  try {
+    const card = await Card.findOne({ uid: req.params.uid });
+    if (!card) return res.status(404).json({ error: 'Card not found' });
+
+    if (!card.passcodeSet) {
+      return res.status(400).json({ error: 'No passcode set. Use set-passcode endpoint first.' });
+    }
+
+    const isValid = await verifyPasscode(oldPasscode, card.passcode);
+    if (!isValid) return res.status(401).json({ error: 'Incorrect old passcode' });
+
+    card.passcode = await hashPasscode(newPasscode);
+    card.updatedAt = Date.now();
+    await card.save();
+
+    res.json({ success: true, message: 'Passcode changed successfully' });
+  } catch (err) {
+    console.error('Change passcode error:', err);
+    res.status(500).json({ error: 'Failed to change passcode' });
+  }
+});
+
+// Verify passcode
+app.post('/card/:uid/verify-passcode', async (req, res) => {
+  const { passcode } = req.body;
+
+  if (!passcode || !/^\d{6}$/.test(passcode)) {
+    return res.status(400).json({ error: 'Passcode must be exactly 6 digits', valid: false });
+  }
+
+  try {
+    const card = await Card.findOne({ uid: req.params.uid });
+    if (!card) return res.status(404).json({ error: 'Card not found', valid: false });
+
+    if (!card.passcodeSet) {
+      return res.status(400).json({ error: 'No passcode set for this card', valid: false });
+    }
+
+    const isValid = await verifyPasscode(passcode, card.passcode);
+
+    if (isValid) {
+      res.json({ success: true, valid: true, message: 'Passcode verified' });
+    } else {
+      res.status(401).json({ error: 'Incorrect passcode', valid: false });
+    }
+  } catch (err) {
+    console.error('Verify passcode error:', err);
+    res.status(500).json({ error: 'Failed to verify passcode', valid: false });
+  }
+});
+
+// Transaction history
 app.get('/transactions/:uid', async (req, res) => {
   try {
     const transactions = await Transaction.find({ uid: req.params.uid })
       .sort({ timestamp: -1 })
-      .limit(50); // Limit to last 50 transactions
+      .limit(50);
     res.json(transactions);
   } catch (err) {
     console.error('Database error:', err);
@@ -522,7 +1089,6 @@ app.get('/transactions/:uid', async (req, res) => {
   }
 });
 
-// Get all transactions (optional - for admin view)
 app.get('/transactions', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 100;
@@ -536,13 +1102,124 @@ app.get('/transactions', async (req, res) => {
   }
 });
 
-// Socket connectivity
+// ==================== SYSTEM SETTINGS ====================
+
+app.get('/settings', authenticateToken, requireRole('agent'), async (req, res) => {
+  try {
+    const settings = await Settings.find();
+    const result = {};
+    settings.forEach(s => { result[s.key] = s.value; });
+    res.json(result);
+  } catch (err) {
+    console.error('Get settings error:', err);
+    res.status(500).json({ error: 'Failed to get settings' });
+  }
+});
+
+app.put('/settings', authenticateToken, requireRole('agent'), async (req, res) => {
+  try {
+    const updates = req.body;
+    for (const [key, value] of Object.entries(updates)) {
+      await Settings.findOneAndUpdate(
+        { key },
+        { key, value, updatedAt: Date.now() },
+        { upsert: true }
+      );
+    }
+    res.json({ success: true, message: 'Settings updated' });
+  } catch (err) {
+    console.error('Update settings error:', err);
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
+// System Stats endpoint
+app.get('/stats', async (req, res) => {
+  try {
+    const cards = await Card.find();
+    const transactions = await Transaction.find();
+    const today = new Date().toDateString();
+    const todayTx = transactions.filter(tx => new Date(tx.timestamp).toDateString() === today);
+
+    const topupVolume = transactions.filter(tx => tx.type === 'topup').reduce((sum, tx) => sum + tx.amount, 0);
+    const purchaseVolume = transactions.filter(tx => tx.type === 'debit').reduce((sum, tx) => sum + tx.amount, 0);
+    const netBalance = cards.reduce((sum, card) => sum + card.balance, 0);
+
+    res.json({
+      totalCards: cards.length,
+      totalTransactions: transactions.length,
+      todayTransactions: todayTx.length,
+      topupVolume,
+      purchaseVolume,
+      netBalance,
+      activeCards: cards.filter(c => c.status === 'active').length,
+      suspendedCards: cards.filter(c => c.status === 'suspended').length,
+      blockedCards: cards.filter(c => c.status === 'blocked').length
+    });
+  } catch (err) {
+    console.error('Stats error:', err);
+    res.status(500).json({ error: 'Failed to load stats' });
+  }
+});
+
+// ==================== SEED DEFAULT USERS ====================
+
+async function seedDefaultUsers() {
+  try {
+    const agentExists = await User.findOne({ username: 'agent' });
+    if (!agentExists) {
+      const hashedPassword = await hashPassword('agent123');
+      await User.create({
+        username: 'agent',
+        password: hashedPassword,
+        fullName: 'System Agent',
+        email: 'agent@tapandpay.rw',
+        role: 'agent',
+        passwordSet: true
+      });
+      console.log('Default agent user created (username: agent, password: agent123)');
+    } else if (!agentExists.passwordSet) {
+      // Fix existing agent that may not have passwordSet flag
+      agentExists.passwordSet = true;
+      await agentExists.save();
+    }
+
+    const salesExists = await User.findOne({ username: 'sales' });
+    if (!salesExists) {
+      const hashedPassword = await hashPassword('sales123');
+      await User.create({
+        username: 'sales',
+        password: hashedPassword,
+        fullName: 'Sales Person',
+        email: 'sales@tapandpay.rw',
+        role: 'salesperson',
+        passwordSet: true
+      });
+      console.log('Default salesperson user created (username: sales, password: sales123)');
+    } else if (!salesExists.passwordSet) {
+      salesExists.passwordSet = true;
+      await salesExists.save();
+    }
+  } catch (err) {
+    console.error('Error seeding users:', err);
+  }
+}
+
+// Seed after connection
+mongoose.connection.once('open', () => {
+  seedDefaultUsers();
+});
+
+// ==================== SOCKET ====================
+
 io.on('connection', (socket) => {
   console.log('User connected to the dashboard');
   socket.on('disconnect', () => {
     console.log('User disconnected');
   });
 });
+
+// ==================== START SERVER ====================
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Backend server running on http://0.0.0.0:${PORT}`);

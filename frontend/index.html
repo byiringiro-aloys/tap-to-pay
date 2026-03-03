@@ -4,39 +4,272 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TAP & PAY</title>
+  <title>TAP & PAY — Secure RFID Payment System</title>
+  <meta name="description"
+    content="Tap & Pay - A modern RFID-based cashless payment system for agents and salespersons">
   <link rel="stylesheet" href="style.css">
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="config.js"></script>
 </head>
 
 <body>
-  <!-- Role Selection Popup -->
-  <div id="role-selection-overlay" class="role-overlay">
-    <div class="role-popup">
-      <div class="role-popup-header">
-        <h2>Welcome to TAP & PAY</h2>
-        <p>Please select your role to continue</p>
-      </div>
-      <div class="role-options">
-        <div class="role-card" data-role="admin">
-          <div class="role-icon">👨‍💼</div>
-          <h3>Administrator</h3>
-          <p>Full access to all features including system settings and configurations</p>
-          <button class="role-select-btn">Select</button>
+
+  <!-- ==================== LOGIN PAGE ==================== -->
+  <div id="login-page" class="login-page">
+    <div class="login-bg-effects">
+      <div class="login-orb orb-1"></div>
+      <div class="login-orb orb-2"></div>
+      <div class="login-orb orb-3"></div>
+    </div>
+    <div class="login-container">
+      <div class="login-card">
+        <div class="login-header">
+          <div class="login-logo">
+            <div class="logo-icon">
+              <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                <rect width="40" height="40" rx="12" fill="url(#logoGrad)" />
+                <path d="M12 16H28M12 22H22M16 28H28" stroke="white" stroke-width="2.5" stroke-linecap="round" />
+                <circle cx="28" cy="28" r="6" fill="#10b981" stroke="white" stroke-width="2" />
+                <path d="M25.5 28L27 29.5L30.5 26" stroke="white" stroke-width="1.5" stroke-linecap="round"
+                  stroke-linejoin="round" />
+                <defs>
+                  <linearGradient id="logoGrad" x1="0" y1="0" x2="40" y2="40">
+                    <stop stop-color="#6366f1" />
+                    <stop offset="1" stop-color="#8b5cf6" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <div>
+              <h1>TAP & PAY</h1>
+              <p class="login-tagline">Secure RFID Payment System</p>
+            </div>
+          </div>
         </div>
-        <div class="role-card" data-role="user">
-          <div class="role-icon">👤</div>
-          <h3>Normal User</h3>
-          <p>Access to top-up, marketplace, and transaction history</p>
-          <button class="role-select-btn">Select</button>
+        <form id="login-form" class="login-form" autocomplete="off">
+          <div id="login-error" class="login-error" style="display: none;"></div>
+          <div class="login-input-group">
+            <label for="login-username">Username or Email</label>
+            <div class="login-input-wrapper">
+              <span class="input-icon">👤</span>
+              <input type="text" id="login-username" placeholder="Enter your username or email" required autocomplete="off">
+            </div>
+          </div>
+          <div class="login-input-group">
+            <label for="login-password">Password</label>
+            <div class="login-input-wrapper">
+              <span class="input-icon">🔒</span>
+              <input type="password" id="login-password" placeholder="Enter your password" required autocomplete="off">
+            </div>
+          </div>
+          <button type="submit" id="login-btn" class="login-btn">
+            <span class="login-btn-text">Sign In</span>
+            <span class="login-btn-loader" style="display:none;">
+              <span class="spinner"></span> Signing in...
+            </span>
+          </button>
+        </form>
+        <div class="login-footer">
+          <p>Default credentials:</p>
+          <div class="credential-chips">
+            <span class="credential-chip" onclick="fillCredentials('agent', 'agent123')">
+              <span class="chip-role agent">Agent</span>
+              <span>agent / agent123</span>
+            </span>
+            <span class="credential-chip" onclick="fillCredentials('sales', 'sales123')">
+              <span class="chip-role sales">Sales</span>
+              <span>sales / sales123</span>
+            </span>
+          </div>
+          <p style="margin-top:.75rem"><a href="#" onclick="showView('forgot'); return false;"
+              style="color:var(--primary);font-size:.8rem;text-decoration:none">Forgot Password?</a></p>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- ==================== FORGOT PASSWORD PAGE ==================== -->
+  <div id="forgot-page" class="login-page" style="display: none;">
+    <div class="login-bg-effects">
+      <div class="login-orb orb-1"></div>
+      <div class="login-orb orb-2"></div>
+    </div>
+    <div class="login-container">
+      <div class="login-card">
+        <div class="login-header">
+          <div class="login-logo" style="justify-content:center">
+            <div>
+              <h1>🔑 Forgot Password</h1>
+              <p class="login-tagline">Enter your username to get a reset link</p>
+            </div>
+          </div>
+        </div>
+        <form id="forgot-form" class="login-form" autocomplete="off">
+          <div id="forgot-error" class="login-error" style="display:none;"></div>
+          <div id="forgot-success" class="login-error"
+            style="display:none;background:var(--success-light);border-color:rgba(16,185,129,.3);color:#a7f3d0;"></div>
+          <div class="login-input-group">
+            <label for="forgot-username">Username</label>
+            <div class="login-input-wrapper">
+              <span class="input-icon">👤</span>
+              <input type="text" id="forgot-username" placeholder="Enter your username" required>
+            </div>
+          </div>
+          <button type="submit" id="forgot-btn" class="login-btn">Send Reset Link</button>
+        </form>
+        <div class="login-footer">
+          <p><a href="#" onclick="showView('login'); return false;"
+              style="color:var(--primary);font-size:.85rem;text-decoration:none">← Back to Login</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SETUP PASSWORD PAGE (Salesperson first login) ==================== -->
+  <div id="setup-page" class="login-page" style="display: none;">
+    <div class="login-bg-effects">
+      <div class="login-orb orb-1"></div>
+      <div class="login-orb orb-3"></div>
+    </div>
+    <div class="login-container">
+      <div class="login-card">
+        <div class="login-header">
+          <div class="login-logo" style="justify-content:center">
+            <div>
+              <h1>🛡️ Set Your Password</h1>
+              <p class="login-tagline">Welcome! Create a password for your new account</p>
+            </div>
+          </div>
+        </div>
+        <form id="setup-password-form" class="login-form" autocomplete="off">
+          <div id="setup-error" class="login-error" style="display:none;"></div>
+          <div class="login-input-group">
+            <label for="setup-password">New Password</label>
+            <div class="login-input-wrapper">
+              <span class="input-icon">🔒</span>
+              <input type="password" id="setup-password" placeholder="Minimum 6 characters" required minlength="6">
+            </div>
+          </div>
+          <div class="login-input-group">
+            <label for="setup-confirm">Confirm Password</label>
+            <div class="login-input-wrapper">
+              <span class="input-icon">🔒</span>
+              <input type="password" id="setup-confirm" placeholder="Confirm your password" required>
+            </div>
+          </div>
+          <button type="submit" id="setup-btn" class="login-btn">Set Password & Continue</button>
+        </form>
+        <div id="setup-success" class="login-error"
+          style="display:none;background:var(--success-light);border-color:rgba(16,185,129,.3);color:#a7f3d0;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== RESET PASSWORD PAGE ==================== -->
+  <div id="reset-page" class="login-page" style="display: none;">
+    <div class="login-bg-effects">
+      <div class="login-orb orb-2"></div>
+      <div class="login-orb orb-3"></div>
+    </div>
+    <div class="login-container">
+      <div class="login-card">
+        <div class="login-header">
+          <div class="login-logo" style="justify-content:center">
+            <div>
+              <h1>🔄 Reset Password</h1>
+              <p class="login-tagline">Enter your new password</p>
+            </div>
+          </div>
+        </div>
+        <form id="reset-password-form" class="login-form" autocomplete="off">
+          <div id="reset-error" class="login-error" style="display:none;"></div>
+          <div class="login-input-group">
+            <label for="reset-password">New Password</label>
+            <div class="login-input-wrapper">
+              <span class="input-icon">🔒</span>
+              <input type="password" id="reset-password" placeholder="Minimum 6 characters" required minlength="6">
+            </div>
+          </div>
+          <div class="login-input-group">
+            <label for="reset-confirm">Confirm Password</label>
+            <div class="login-input-wrapper">
+              <span class="input-icon">🔒</span>
+              <input type="password" id="reset-confirm" placeholder="Confirm your password" required>
+            </div>
+          </div>
+          <button type="submit" id="reset-btn" class="login-btn">Reset Password</button>
+        </form>
+        <div id="reset-success" class="login-error"
+          style="display:none;background:var(--success-light);border-color:rgba(16,185,129,.3);color:#a7f3d0;"></div>
+        <div class="login-footer">
+          <p><a href="#" onclick="showView('login'); return false;"
+              style="color:var(--primary);font-size:.85rem;text-decoration:none">← Back to Login</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MAIN APPLICATION ==================== -->
+  <div id="app-container" class="app-container" style="display: none;">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <div class="brand-icon">
+            <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
+              <rect width="40" height="40" rx="12" fill="url(#sideLogoGrad)" />
+              <path d="M12 16H28M12 22H22M16 28H28" stroke="white" stroke-width="2.5" stroke-linecap="round" />
+              <circle cx="28" cy="28" r="6" fill="#10b981" stroke="white" stroke-width="2" />
+              <path d="M25.5 28L27 29.5L30.5 26" stroke="white" stroke-width="1.5" stroke-linecap="round"
+                stroke-linejoin="round" />
+              <defs>
+                <linearGradient id="sideLogoGrad" x1="0" y1="0" x2="40" y2="40">
+                  <stop stop-color="#6366f1" />
+                  <stop offset="1" stop-color="#8b5cf6" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <div>
+            <h1 class="brand-title">TAP & PAY</h1>
+            <p class="brand-role" id="sidebar-role">Dashboard</p>
+          </div>
+        </div>
+        <div class="connection-indicator">
+          <span class="indicator-dot" id="connection-indicator"></span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" id="sidebar-nav">
+        <!-- Navigation items injected by JS based on role -->
+      </nav>
+
+      <div class="sidebar-user">
+        <div class="user-info">
+          <div class="user-avatar" id="user-avatar">A</div>
+          <div class="user-details">
+            <span class="user-name" id="user-fullname">User</span>
+            <span class="user-role-badge" id="user-role-badge">Role</span>
+          </div>
+        </div>
+        <button class="logout-btn" id="logout-btn" title="Logout">
+          <span>🚪</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content" id="main-content">
+      <!-- Content sections injected by JS based on role -->
+    </main>
+  </div>
+
+  <!-- ==================== MODALS ==================== -->
 
   <!-- Passcode Modal -->
   <div id="passcode-modal" class="modal-overlay" style="display: none;">
@@ -48,12 +281,18 @@
       <div class="modal-body">
         <p id="passcode-modal-message">Enter your 6-digit passcode to authorize payment</p>
         <div class="passcode-input-container">
-          <input type="text" class="passcode-digit" maxlength="1" data-index="0" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
-          <input type="text" class="passcode-digit" maxlength="1" data-index="1" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
-          <input type="text" class="passcode-digit" maxlength="1" data-index="2" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
-          <input type="text" class="passcode-digit" maxlength="1" data-index="3" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
-          <input type="text" class="passcode-digit" maxlength="1" data-index="4" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
-          <input type="text" class="passcode-digit" maxlength="1" data-index="5" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
+          <input type="password" class="passcode-digit" maxlength="1" data-index="0" inputmode="numeric" pattern="[0-9]"
+            autocomplete="off" />
+          <input type="password" class="passcode-digit" maxlength="1" data-index="1" inputmode="numeric" pattern="[0-9]"
+            autocomplete="off" />
+          <input type="password" class="passcode-digit" maxlength="1" data-index="2" inputmode="numeric" pattern="[0-9]"
+            autocomplete="off" />
+          <input type="password" class="passcode-digit" maxlength="1" data-index="3" inputmode="numeric" pattern="[0-9]"
+            autocomplete="off" />
+          <input type="password" class="passcode-digit" maxlength="1" data-index="4" inputmode="numeric" pattern="[0-9]"
+            autocomplete="off" />
+          <input type="password" class="passcode-digit" maxlength="1" data-index="5" inputmode="numeric" pattern="[0-9]"
+            autocomplete="off" />
         </div>
         <div id="passcode-error" class="passcode-error" style="display: none;"></div>
       </div>
@@ -64,419 +303,74 @@
     </div>
   </div>
 
-  <div class="dashboard">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <div class="sidebar-title-row">
-          <div>
-            <h1>TAP & PAY</span></h1>
-            <p class="sidebar-subtitle">Dashboard</p>
-          </div>
-          <div class="connection-indicator">
-            <span class="indicator-dot" id="connection-indicator"></span>
-          </div>
+  <!-- Edit Card Modal (Agent) -->
+  <div id="edit-card-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content edit-card-modal">
+      <div class="modal-header">
+        <h3>Edit Card Details</h3>
+        <button class="modal-close" onclick="closeEditCardModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-input-group">
+          <label>Card UID</label>
+          <input type="text" id="edit-card-uid" readonly class="input-readonly">
+        </div>
+        <div class="modal-input-group">
+          <label>Holder Name</label>
+          <input type="text" id="edit-card-name" placeholder="Enter holder name">
+        </div>
+        <div class="modal-input-group">
+          <label>Email</label>
+          <input type="email" id="edit-card-email" placeholder="Enter email">
+        </div>
+        <div class="modal-input-group">
+          <label>Phone</label>
+          <input type="tel" id="edit-card-phone" placeholder="Enter phone">
+        </div>
+        <div class="modal-input-group">
+          <label>Balance ($)</label>
+          <input type="number" id="edit-card-balance" step="0.01" placeholder="0.00">
+        </div>
+        <div class="modal-input-group">
+          <label>Status</label>
+          <select id="edit-card-status">
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+            <option value="blocked">Blocked</option>
+          </select>
         </div>
       </div>
-
-      <nav class="sidebar-nav">
-        <a href="#" class="nav-item active" data-section="topup">
-          <span class="nav-icon">💳</span>
-          <span class="nav-text">Top Up Card</span>
-        </a>
-        <a href="#" class="nav-item" data-section="marketplace">
-          <span class="nav-icon">🛒</span>
-          <span class="nav-text">Marketplace</span>
-        </a>
-        <a href="#" class="nav-item" data-section="history">
-          <span class="nav-icon">📊</span>
-          <span class="nav-text">Transactions</span>
-        </a>
-        <a href="#" class="nav-item" data-section="settings">
-          <span class="nav-icon">⚙️</span>
-          <span class="nav-text">Settings</span>
-        </a>
-      </nav>
-
-      <div class="sidebar-support">
-        <div class="support-card">
-          <div class="support-icon">💬</div>
-          <h4>Need Help?</h4>
-          <p>Get in touch with our support team for assistance.</p>
-          <a href="mailto:byiringiroaloys8@gmail.com" class="support-link">
-            <span>✉️</span> support@aloys.work
-          </a>
-        </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeEditCardModal()">Cancel</button>
+        <button class="btn-primary" id="save-card-btn" onclick="saveCardChanges()">Save Changes</button>
       </div>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="main-content">
-      <!-- Quick Stats Cards -->
-      <div class="stats-grid">
-        <div class="stat-card-main">
-          <div class="stat-icon">💳</div>
-          <div class="stat-content">
-            <div class="stat-label">Total Cards</div>
-            <div class="stat-value" id="total-cards">0</div>
-          </div>
-        </div>
-        <div class="stat-card-main">
-          <div class="stat-icon">📈</div>
-          <div class="stat-content">
-            <div class="stat-label">Today's Transactions</div>
-            <div class="stat-value" id="today-transactions">0</div>
-          </div>
-        </div>
-        <div class="stat-card-main">
-          <div class="stat-icon">💰</div>
-          <div class="stat-content">
-            <div class="stat-label">Top-Up Volume</div>
-            <div class="stat-value" id="total-volume">$0.00</div>
-          </div>
-        </div>
-        <div class="stat-card-main">
-          <div class="stat-icon">🛍️</div>
-          <div class="stat-content">
-            <div class="stat-label">Total Purchases</div>
-            <div class="stat-value" id="total-payments">$0.00</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===================== SECTION: TOP UP CARD ===================== -->
-      <div id="section-topup" class="page-section active-section">
-        <div class="section-header">
-          <h2 class="section-title">💳 Top Up Card</h2>
-          <p class="section-subtitle">Scan your RFID card and add funds to your balance</p>
-        </div>
-
-        <div class="content-grid">
-          <!-- Card Status -->
-          <div class="glass-card card-status-section">
-            <h3>Active Card</h3>
-            <div class="card-visual-container">
-              <div id="card-visual" class="card-visual">
-                <div class="card-chip"></div>
-                <div class="card-number">**** **** **** ****</div>
-                <div class="card-details">
-                  <div class="card-holder-group">
-                    <span class="card-label">CARD HOLDER</span>
-                    <span id="card-uid-display" class="card-value">NO CARD</span>
-                  </div>
-                  <div class="card-balance-group">
-                    <span class="card-label">BALANCE</span>
-                    <span id="card-balance-display" class="card-value">$0.00</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div id="status-display" class="status-content">
-              <div class="status-placeholder">Scan an RFID card to begin...</div>
-            </div>
-          </div>
-
-          <!-- Top Up Form -->
-          <div class="glass-card topup-section">
-            <h3>Add Funds</h3>
-            <div class="input-group">
-              <label for="uid">Card UID</label>
-              <input type="text" id="uid" placeholder="UID auto-populated on scan" readonly>
-            </div>
-            <div class="input-group">
-              <label for="holderName">Card Holder Name</label>
-              <input type="text" id="holderName" placeholder="Enter name for new cards">
-            </div>
-            
-            <!-- Passcode setup for new cards -->
-            <div id="new-card-passcode-section" class="new-card-passcode-section" style="display: none;">
-              <label class="passcode-setup-label">🔒 Set Passcode (New Card)</label>
-              <p class="passcode-setup-hint">Create a 6-digit passcode to secure your card</p>
-              <div class="setup-passcode-container">
-                <input type="password" class="setup-passcode-digit" maxlength="1" data-index="0" inputmode="numeric" pattern="[0-9]" />
-                <input type="password" class="setup-passcode-digit" maxlength="1" data-index="1" inputmode="numeric" pattern="[0-9]" />
-                <input type="password" class="setup-passcode-digit" maxlength="1" data-index="2" inputmode="numeric" pattern="[0-9]" />
-                <input type="password" class="setup-passcode-digit" maxlength="1" data-index="3" inputmode="numeric" pattern="[0-9]" />
-                <input type="password" class="setup-passcode-digit" maxlength="1" data-index="4" inputmode="numeric" pattern="[0-9]" />
-                <input type="password" class="setup-passcode-digit" maxlength="1" data-index="5" inputmode="numeric" pattern="[0-9]" />
-              </div>
-              <div id="setup-passcode-error" class="setup-passcode-error" style="display: none;"></div>
-            </div>
-            
-            <div class="quick-amounts">
-              <button class="quick-amount-btn" data-amount="5">$5</button>
-              <button class="quick-amount-btn" data-amount="10">$10</button>
-              <button class="quick-amount-btn" data-amount="20">$20</button>
-              <button class="quick-amount-btn" data-amount="50">$50</button>
-            </div>
-            <div class="input-group">
-              <label for="amount">Custom Amount ($)</label>
-              <input type="number" id="amount" placeholder="0.00" step="0.01">
-            </div>
-            <button id="topup-btn" class="topup-btn" disabled>
-              <span class="btn-icon">💳</span> Confirm Top Up
-            </button>
-            <button id="set-passcode-btn" class="set-passcode-btn" style="display: none;">
-              <span class="btn-icon">🔒</span> Set Passcode
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===================== SECTION: MARKETPLACE ===================== -->
-      <div id="section-marketplace" class="page-section">
-        <div class="section-header">
-          <h2 class="section-title">🛒 Marketplace</h2>
-          <p class="section-subtitle">Browse products and pay with your RFID card</p>
-        </div>
-
-        <div class="marketplace-layout">
-          <!-- Product Grid -->
-          <div class="glass-card marketplace-products">
-            <div class="marketplace-header">
-              <h3>Available Products</h3>
-              <div class="cart-badge" id="cart-badge" style="display: none;">
-                <span id="cart-count">0</span>
-              </div>
-            </div>
-            
-            <!-- Category Filter -->
-            <div class="category-filter">
-              <button class="category-btn active" data-category="all">All</button>
-              <button class="category-btn" data-category="food">Food</button>
-              <button class="category-btn" data-category="rwandan">🇷🇼 Rwandan</button>
-              <button class="category-btn" data-category="drinks">Drinks</button>
-              <button class="category-btn" data-category="domains">Domains</button>
-              <button class="category-btn" data-category="services">Services</button>
-            </div>
-            
-            <div class="product-grid" id="product-grid">
-              <!-- Products loaded dynamically -->
-            </div>
-          </div>
-
-          <!-- Shopping Cart -->
-          <div class="glass-card shopping-cart">
-            <h3>🛍️ Shopping Cart</h3>
-            <div id="cart-items" class="cart-items">
-              <div class="cart-empty">
-                <span class="cart-empty-icon">🛒</span>
-                <p>Your cart is empty</p>
-                <p class="cart-empty-hint">Click products to add them</p>
-              </div>
-            </div>
-            <div class="cart-summary" id="cart-summary" style="display: none;">
-              <div class="cart-summary-row">
-                <span>Items</span>
-                <span id="cart-total-items">0</span>
-              </div>
-              <div class="cart-summary-row cart-total-row">
-                <span>Total</span>
-                <span id="cart-total-price">$0.00</span>
-              </div>
-            </div>
-            
-            <!-- Passcode Input Section -->
-            <div id="checkout-passcode-section" class="checkout-passcode-section" style="display: none;">
-              <label class="passcode-label">🔒 Enter Passcode</label>
-              <div class="inline-passcode-container">
-                <input type="password" class="inline-passcode-digit" maxlength="1" data-index="0" inputmode="numeric" pattern="[0-9]" />
-                <input type="password" class="inline-passcode-digit" maxlength="1" data-index="1" inputmode="numeric" pattern="[0-9]" />
-                <input type="password" class="inline-passcode-digit" maxlength="1" data-index="2" inputmode="numeric" pattern="[0-9]" />
-                <input type="password" class="inline-passcode-digit" maxlength="1" data-index="3" inputmode="numeric" pattern="[0-9]" />
-                <input type="password" class="inline-passcode-digit" maxlength="1" data-index="4" inputmode="numeric" pattern="[0-9]" />
-                <input type="password" class="inline-passcode-digit" maxlength="1" data-index="5" inputmode="numeric" pattern="[0-9]" />
-              </div>
-              <div id="inline-passcode-error" class="inline-passcode-error" style="display: none;"></div>
-            </div>
-            
-            <div id="payment-status-msg" class="payment-status-msg"></div>
-            <button id="checkout-btn" class="checkout-btn" disabled>
-              <span class="btn-icon">💳</span> Checkout & Pay
-            </button>
-            <p class="checkout-hint" id="checkout-hint">Scan your card first to enable checkout</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===================== SECTION: TRANSACTION HISTORY ===================== -->
-      <div id="section-history" class="page-section">
-        <div class="section-header">
-          <h2 class="section-title">📊 Transaction History</h2>
-          <p class="section-subtitle">View all top-ups and purchase records</p>
-        </div>
-
-        <div class="history-layout">
-          <!-- Top-Up History -->
-          <div class="glass-card history-panel">
-            <div class="history-panel-header">
-              <h3>💰 Top-Up History</h3>
-              <span class="history-count" id="topup-count">0 records</span>
-            </div>
-            <div id="topup-history" class="transaction-list">
-              <p class="empty-history">No top-up transactions yet</p>
-            </div>
-          </div>
-
-          <!-- Purchase History -->
-          <div class="glass-card history-panel">
-            <div class="history-panel-header">
-              <h3>🛍️ Purchase History</h3>
-              <span class="history-count" id="purchase-count">0 records</span>
-            </div>
-            <div id="purchase-history" class="transaction-list">
-              <p class="empty-history">No purchase transactions yet</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===================== SECTION: SETTINGS ===================== -->
-      <div id="section-settings" class="page-section">
-        <div class="section-header">
-          <h2 class="section-title">⚙️ Settings & System Info</h2>
-          <p class="section-subtitle">Monitor system health, view statistics, and configuration details</p>
-        </div>
-
-        <div class="settings-layout">
-          <!-- System Status Panel -->
-          <div class="glass-card settings-panel">
-            <h3>🔌 System Status</h3>
-            <div class="settings-status-grid">
-              <div class="settings-status-card">
-                <div class="settings-status-icon online" id="settings-mqtt-indicator"></div>
-                <div class="settings-status-info">
-                  <div class="settings-status-name">MQTT Broker</div>
-                  <div class="settings-status-detail" id="settings-mqtt-status">Connecting...</div>
-                </div>
-              </div>
-              <div class="settings-status-card">
-                <div class="settings-status-icon online" id="settings-backend-indicator"></div>
-                <div class="settings-status-info">
-                  <div class="settings-status-name">Backend Server</div>
-                  <div class="settings-status-detail" id="settings-backend-status">Connecting...</div>
-                </div>
-              </div>
-              <div class="settings-status-card">
-                <div class="settings-status-icon" id="settings-db-indicator"></div>
-                <div class="settings-status-info">
-                  <div class="settings-status-name">MongoDB Database</div>
-                  <div class="settings-status-detail" id="settings-db-status">Unknown</div>
-                </div>
-              </div>
-              <div class="settings-status-card">
-                <div class="settings-status-icon" id="settings-ws-indicator"></div>
-                <div class="settings-status-info">
-                  <div class="settings-status-name">WebSocket</div>
-                  <div class="settings-status-detail" id="settings-ws-status">Connecting...</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Overview Statistics -->
-          <div class="glass-card settings-panel">
-            <h3>📈 Overview Statistics</h3>
-            <div class="settings-stats-grid">
-              <div class="settings-stat-card">
-                <div class="settings-stat-icon">💳</div>
-                <div class="settings-stat-value" id="settings-total-cards">0</div>
-                <div class="settings-stat-label">Registered Cards</div>
-              </div>
-              <div class="settings-stat-card">
-                <div class="settings-stat-icon">📊</div>
-                <div class="settings-stat-value" id="settings-total-transactions">0</div>
-                <div class="settings-stat-label">Total Transactions</div>
-              </div>
-              <div class="settings-stat-card">
-                <div class="settings-stat-icon">💰</div>
-                <div class="settings-stat-value" id="settings-topup-volume">$0.00</div>
-                <div class="settings-stat-label">Top-Up Volume</div>
-              </div>
-              <div class="settings-stat-card">
-                <div class="settings-stat-icon">🛍️</div>
-                <div class="settings-stat-value" id="settings-purchase-volume">$0.00</div>
-                <div class="settings-stat-label">Purchase Volume</div>
-              </div>
-              <div class="settings-stat-card">
-                <div class="settings-stat-icon">📅</div>
-                <div class="settings-stat-value" id="settings-today-tx">0</div>
-                <div class="settings-stat-label">Today's Transactions</div>
-              </div>
-              <div class="settings-stat-card">
-                <div class="settings-stat-icon">💵</div>
-                <div class="settings-stat-value" id="settings-net-balance">$0.00</div>
-                <div class="settings-stat-label">Net Card Balance</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- System Information -->
-          <div class="glass-card settings-panel">
-            <h3>🖥️ System Information</h3>
-            <div class="settings-info-list">
-              <div class="settings-info-row">
-                <span class="settings-info-label">Application</span>
-                <span class="settings-info-value">RFID Dashboard</span>
-              </div>
-              <div class="settings-info-row">
-                <span class="settings-info-label">Version</span>
-                <span class="settings-info-value">1.2.0</span>
-              </div>
-              <div class="settings-info-row">
-                <span class="settings-info-label">Team ID</span>
-                <span class="settings-info-value badge">team_rdf</span>
-              </div>
-              <div class="settings-info-row">
-                <span class="settings-info-label">Backend URL</span>
-                <span class="settings-info-value mono" id="settings-backend-url">—</span>
-              </div>
-              <div class="settings-info-row">
-                <span class="settings-info-label">MQTT Broker</span>
-                <span class="settings-info-value mono">broker.benax.rw:1883</span>
-              </div>
-              <div class="settings-info-row">
-                <span class="settings-info-label">Database</span>
-                <span class="settings-info-value mono">MongoDB Atlas</span>
-              </div>
-              <div class="settings-info-row">
-                <span class="settings-info-label">WebSocket</span>
-                <span class="settings-info-value mono">Socket.IO v4.7.2</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- MQTT Topics -->
-          <div class="glass-card settings-panel">
-            <h3>📡 MQTT Topic Configuration</h3>
-            <div class="settings-info-list">
-              <div class="settings-info-row">
-                <span class="settings-info-label">Card Status</span>
-                <span class="settings-info-value mono topic">rfid/team_rdf/card/status</span>
-              </div>
-              <div class="settings-info-row">
-                <span class="settings-info-label">Card Balance</span>
-                <span class="settings-info-value mono topic">rfid/team_rdf/card/balance</span>
-              </div>
-              <div class="settings-info-row">
-                <span class="settings-info-label">Top-Up</span>
-                <span class="settings-info-value mono topic">rfid/team_rdf/card/topup</span>
-              </div>
-              <div class="settings-info-row">
-                <span class="settings-info-label">Payment</span>
-                <span class="settings-info-value mono topic">rfid/team_rdf/card/payment</span>
-              </div>
-              <div class="settings-info-row">
-                <span class="settings-info-label">Topic Prefix</span>
-                <span class="settings-info-value mono badge">rfid/team_rdf/</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </main>
+    </div>
   </div>
+
+  <!-- Receipt Modal -->
+  <div id="receipt-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content receipt-modal">
+      <div class="modal-header">
+        <h3>🧾 Payment Receipt</h3>
+        <button class="modal-close" onclick="closeReceiptModal()">✕</button>
+      </div>
+      <div class="modal-body" id="receipt-content">
+        <!-- Receipt content injected by JS -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeReceiptModal()">Close</button>
+        <button class="btn-primary" onclick="printReceipt()">🖨️ Print Receipt</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notifications -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="auth.js"></script>
+  <script src="shared.js"></script>
+  <script src="agent.js"></script>
+  <script src="sales.js"></script>
   <script src="app.js"></script>
 </body>
 

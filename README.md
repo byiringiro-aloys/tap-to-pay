@@ -29,8 +29,16 @@ A complete RFID-based payment system with real-time card management, secure pass
 ## 👁️ Features
 
 ### 🔐 Security & Authentication
-- **Passcode Protection**: 6-digit PIN for all transactions
-- **Bcrypt Hashing**: Military-grade password encryption
+- **Email-Based Registration**: Agents register users who receive setup emails
+- **Resend Email Integration**: Beautiful branded emails for setup and password reset
+- **Dual Login**: Users can login with username OR email
+- **Password Reset Flow**: Forgot password with email verification
+- **JWT Authentication**: Secure token-based authentication (24-hour expiry)
+- **Bcrypt Hashing**: Military-grade password encryption (10 salt rounds)
+- **Role-Based Access**: Agent and salesperson roles with different permissions
+- **Setup Tokens**: 72-hour validity for new user account setup
+- **Reset Tokens**: 1-hour validity for password reset links
+- **Passcode Protection**: 6-digit PIN for card transactions
 - **Auto-Submit**: Instant processing after entering passcode
 - **Grace Period**: 60 seconds for new card registration, 15 seconds for payments
 
@@ -77,6 +85,70 @@ A complete RFID-based payment system with real-time card management, secure pass
 - **Backend Port**: 8208
 - **Frontend Port**: 9208
 - **MQTT Broker**: 157.173.101.159:1883
+
+## 🔐 Authentication System
+
+### User Registration Flow (Agent Only)
+
+1. **Agent creates new salesperson account:**
+   - Enters full name and email address
+   - System auto-generates username from email
+   - Setup token created (valid 72 hours)
+   - Beautiful email sent via Resend API
+
+2. **Salesperson receives email:**
+   - Contains username and setup link
+   - Professional TAP & PAY branding
+   - Click link to set password
+
+3. **Salesperson completes setup:**
+   - Opens setup link from email
+   - Creates password (min 6 characters)
+   - Account activated automatically
+
+4. **Salesperson can login:**
+   - Uses username OR email
+   - Uses password they created
+   - Access to sales dashboard
+
+### Login System
+
+Users can login with:
+- **Username** (e.g., `johndoe`)
+- **Email** (e.g., `john.doe@company.com`)
+
+Plus their password.
+
+### Password Reset Flow
+
+1. User clicks "Forgot Password?"
+2. Enters username
+3. Receives reset email (if account exists)
+4. Clicks reset link (valid 1 hour)
+5. Sets new password
+6. Can login immediately
+
+### Default Accounts
+
+**Agent Account:**
+- Username: `agent`
+- Password: `agent123`
+- Role: Full system access
+
+**Salesperson Account:**
+- Username: `sales`
+- Password: `sales123`
+- Role: Sales processing only
+
+### Email Templates
+
+Both setup and reset emails feature:
+- TAP & PAY branding with gradient logo
+- Dark theme matching dashboard
+- Clear call-to-action buttons
+- Security warnings
+- Professional footer
+- Responsive design
 
 ## 🔐 Passcode Authentication System
 
@@ -245,6 +317,17 @@ scp -r tap-to-pay root@157.173.101.159:/root/
 - **System Monitoring**: Live status of all components
 
 ## 🔌 HTTP API Endpoints
+
+### Authentication
+
+- `POST /auth/login` - Login with username/email and password
+- `POST /auth/register` - Register new salesperson (agent only, sends email)
+- `POST /auth/setup-password` - Complete account setup with password
+- `POST /auth/forgot-password` - Request password reset email
+- `POST /auth/reset-password` - Reset password with token
+- `GET /auth/users` - Get all users (agent only)
+- `DELETE /auth/users/:id` - Delete user (agent only)
+- `GET /auth/verify` - Verify JWT token
 
 ### Cards
 
@@ -435,8 +518,15 @@ scp -r tap-to-pay root@157.173.101.159:/root/
 
 ```env
 MONGODB_URI=your_mongodb_connection_string
+JWT_SECRET=your_random_secret_key_for_jwt
+RESEND_API=re_your_resend_api_key
 PORT=8208
 ```
+
+**Get Resend API Key:**
+1. Sign up at [resend.com](https://resend.com)
+2. Create API key
+3. Add to `.env` file
 
 ### Auto-Configuration
 
@@ -456,7 +546,9 @@ No manual configuration needed!
 - **Mongoose**: MongoDB object modeling
 - **MQTT**: IoT messaging protocol
 - **Bcrypt**: Password hashing and encryption
-- **Crypto**: Additional security utilities
+- **JWT**: JSON Web Token authentication
+- **Resend**: Email delivery service
+- **Crypto**: Token generation and security
 
 ### Frontend
 - **HTML5**: Semantic markup
@@ -517,24 +609,33 @@ pm2 monit                          # Monitor resources
 ```
 tap-to-pay/
 ├── backend/
-│   ├── server.js              # Backend API server with passcode auth
-│   ├── package.json           # Dependencies (bcrypt, mqtt, mongoose, etc.)
-│   └── .env                   # MongoDB connection string
+│   ├── server.js              # Backend API with auth & email
+│   ├── package.json           # Dependencies (resend, jwt, bcrypt, etc.)
+│   ├── .env                   # MongoDB, JWT secret, Resend API key
+│   └── .env.example           # Environment template
 ├── frontend/
-│   ├── index.html             # Dashboard UI with role selection
-│   ├── app.js                 # Frontend logic with passcode handling
+│   ├── index.html             # Dashboard UI with auth pages
+│   ├── app.js                 # Main application logic
+│   ├── auth.js                # Authentication module
+│   ├── agent.js               # Agent dashboard
+│   ├── sales.js               # Salesperson dashboard
+│   ├── shared.js              # Shared utilities
 │   ├── style.css              # Mastercard-styled design
 │   ├── config.js              # Auto environment detection
 │   ├── server.js              # Frontend server
 │   └── package.json           # Frontend dependencies
 ├── firmware/
-│   └── rfid_topup_arduino.ino # ESP8266 code with card presence detection
+│   └── rfid_topup_arduino.ino # ESP8266 code with card detection
 ├── docs/
-│   ├── PASSCODE_SYSTEM_READY.md          # Passcode implementation guide
-│   ├── GRACE_PERIOD_UPDATE.md            # Grace period documentation
+│   ├── AUTHENTICATION_GUIDE.md           # Complete auth documentation
+│   ├── SETUP_SUMMARY.md                  # Implementation summary
+│   ├── EMAIL_TEMPLATES.md                # Email design guide
+│   ├── QUICK_START.md                    # 5-minute setup guide
+│   ├── PASSCODE_SYSTEM_READY.md          # Passcode implementation
+│   ├── GRACE_PERIOD_UPDATE.md            # Grace period docs
 │   ├── AUTO_SUBMIT_PASSCODE.md           # Auto-submit feature
 │   ├── IMPROVED_MASTERCARD_DESIGN.md     # Card styling guide
-│   └── IMPLEMENTATION_COMPLETE.md        # Complete implementation docs
+│   └── IMPLEMENTATION_COMPLETE.md        # Complete implementation
 ├── DEPLOYMENT.md              # Detailed deployment guide
 ├── deploy.sh                  # VPS deployment script
 ├── start-local.sh             # Local startup (Linux/Mac)
@@ -543,6 +644,16 @@ tap-to-pay/
 ```
 
 ## 🔐 Security Notes
+
+### Authentication Security
+- **Email Verification**: Users must verify email to set password
+- **JWT Tokens**: 24-hour expiration with secure signing
+- **Setup Tokens**: 72-hour validity, single-use
+- **Reset Tokens**: 1-hour validity, single-use
+- **Bcrypt Hashing**: 10 salt rounds for all passwords
+- **No Plain Text**: Passwords never stored or transmitted unencrypted
+- **Role-Based Access**: Agent and salesperson permissions enforced
+- **Token Invalidation**: Tokens deleted after use
 
 ### Password Security
 - **Bcrypt Hashing**: All passcodes hashed with 10 salt rounds
