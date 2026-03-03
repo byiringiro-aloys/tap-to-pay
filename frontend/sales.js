@@ -344,7 +344,10 @@ async function processCheckout() {
   let passcode = null;
   if (currentCardData && currentCardData.passcodeSet) {
     passcode = Array.from(document.querySelectorAll('.checkout-pass')).map(i => i.value).join('');
-    if (passcode.length !== 6) { showCheckoutMsg('Enter your 6-digit passcode', 'error'); return; }
+    if (passcode.length !== 6) { 
+      showCheckoutPassError('Enter your 6-digit passcode');
+      return; 
+    }
   }
 
   const btn = document.getElementById('checkout-pay-btn');
@@ -372,11 +375,38 @@ async function processCheckout() {
       showToast(`Payment successful! Balance: $${data.card.balance.toFixed(2)}`, 'success');
 
       // Show receipt
-      showReceipt({
+      const transaction = {
         ...data.transaction,
         holderName: data.card.holderName,
         uid: data.card.uid
-      });
+      };
+      showReceipt(transaction);
+
+      // Automatically send receipt email if card has email
+      if (data.card.email && data.card.email.trim()) {
+        try {
+          const emailRes = await fetch(`${BACKEND_URL}/send-receipt`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: data.card.email,
+              transaction: transaction
+            })
+          });
+          const emailData = await emailRes.json();
+          if (emailData.success) {
+            showToast(`Receipt sent to ${data.card.email}`, 'success');
+          } else {
+            console.error('Email send failed:', emailData.error);
+            showToast(`Payment successful but email failed: ${emailData.error || 'Unknown error'}`, 'error');
+          }
+        } catch (emailErr) {
+          console.error('Failed to send receipt email:', emailErr);
+          showToast('Payment successful but failed to send email receipt', 'error');
+        }
+      } else {
+        console.log('No email address on card - skipping email receipt');
+      }
 
       // Clear cart after successful payment
       cart = [];
@@ -388,6 +418,12 @@ async function processCheckout() {
       document.querySelectorAll('.checkout-pass').forEach(i => i.value = '');
       loadSalesHistory();
     } else {
+      // Clear passcode on error (especially for invalid passcode)
+      if (data.error && (data.error.toLowerCase().includes('passcode') || data.error.toLowerCase().includes('incorrect'))) {
+        clearCheckoutPasscode();
+        showCheckoutPassError(data.error);
+      }
+      
       if (data.rolledBack) showCheckoutMsg(`❌ ${data.error} (Transaction rolled back)`, 'error');
       else showCheckoutMsg(`❌ ${data.error}`, 'error');
     }
@@ -404,6 +440,30 @@ function showCheckoutMsg(msg, type) {
   if (!el) return;
   el.textContent = msg; el.className = `payment-status-msg show ${type}`;
   setTimeout(() => { el.className = 'payment-status-msg'; }, 6000);
+}
+
+function showCheckoutPassError(msg) {
+  const el = document.getElementById('checkout-pass-error');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+  
+  // Shake animation on passcode inputs
+  document.querySelectorAll('.checkout-pass').forEach(i => {
+    i.style.animation = 'shake 0.5s';
+    setTimeout(() => i.style.animation = '', 500);
+  });
+  
+  // Hide error after 3 seconds
+  setTimeout(() => {
+    el.style.display = 'none';
+  }, 3000);
+}
+
+function clearCheckoutPasscode() {
+  document.querySelectorAll('.checkout-pass').forEach(i => i.value = '');
+  const firstInput = document.querySelector('.checkout-pass[data-index="0"]');
+  if (firstInput) setTimeout(() => firstInput.focus(), 100);
 }
 
 async function loadSalesHistory() {

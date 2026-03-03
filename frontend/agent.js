@@ -335,7 +335,7 @@ function renderTxList(containerId, txs) {
         // Build description with items if available
         let description = tx.description || tx.type;
         if (tx.items && tx.items.length > 0) {
-            const itemsList = tx.items.map(item => `${item.name} (${item.quantity}x)`).join(', ');
+            const itemsList = tx.items.map(item => `${item.name} (${item.qty || item.quantity || 1}x)`).join(', ');
             description = `${tx.holderName} - ${itemsList}`;
         } else {
             description = `${tx.holderName} - ${description}`;

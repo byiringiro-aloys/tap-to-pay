@@ -1414,3 +1414,132 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`Backend server running on http://0.0.0.0:${PORT}`);
   console.log(`Access from: http://157.173.101.159:${PORT}`);
 });
+
+// Send receipt email
+app.post('/send-receipt', async (req, res) => {
+  const { email, transaction } = req.body;
+  
+  console.log(`📧 Receipt email request received for: ${email}`);
+  
+  if (!email || !transaction) {
+    console.error('❌ Missing email or transaction data');
+    return res.status(400).json({ error: 'Email and transaction data required' });
+  }
+
+  if (!RESEND_API_KEY) {
+    console.error('❌ RESEND_API_KEY not configured');
+    return res.status(500).json({ error: 'Email service not configured' });
+  }
+
+  console.log(`📧 Sending receipt for transaction ${transaction.receiptId} to ${email}`);
+
+  try {
+    const date = new Date(transaction.timestamp);
+    
+    // Build items HTML
+    let itemsHtml = '';
+    if (transaction.items && transaction.items.length > 0) {
+      itemsHtml = '<h3 style="color:#6366f1;margin-top:30px;">Items Purchased</h3><table style="width:100%;border-collapse:collapse;margin-top:15px;">';
+      transaction.items.forEach(item => {
+        const qty = item.qty || item.quantity || 1;
+        itemsHtml += `
+          <tr style="border-bottom:1px solid #e5e7eb;">
+            <td style="padding:10px 0;">${item.name} x${qty}</td>
+            <td style="padding:10px 0;text-align:right;font-weight:600;">$${(item.price * qty).toFixed(2)}</td>
+          </tr>`;
+      });
+      itemsHtml += '</table>';
+    }
+
+    const result = await resend.emails.send({
+      from: 'TAP & PAY <tap-to-pay@aloys.work>',
+      to: [email],
+      subject: `TAP & PAY Receipt - ${transaction.receiptId}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f3f4f6; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 40px auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 40px 30px; text-align: center; color: white; }
+            .header h1 { margin: 0; font-size: 32px; font-weight: 800; }
+            .header p { margin: 8px 0 0 0; font-size: 14px; opacity: 0.9; }
+            .receipt-id { background: rgba(255,255,255,0.2); display: inline-block; padding: 8px 16px; border-radius: 6px; margin-top: 15px; font-family: monospace; font-size: 14px; }
+            .content { padding: 40px 30px; }
+            .detail-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
+            .detail-label { color: #6b7280; font-size: 14px; }
+            .detail-value { color: #111827; font-weight: 600; font-size: 14px; }
+            .total-row { display: flex; justify-content: space-between; padding: 20px 0; margin-top: 20px; border-top: 2px solid #6366f1; }
+            .total-label { color: #6366f1; font-size: 18px; font-weight: 700; }
+            .total-value { color: #6366f1; font-size: 24px; font-weight: 800; }
+            .footer { background: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 13px; }
+            .footer p { margin: 5px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>TAP & PAY</h1>
+              <p>Payment Receipt</p>
+              <div class="receipt-id">${transaction.receiptId || 'N/A'}</div>
+            </div>
+            <div class="content">
+              <div class="detail-row">
+                <span class="detail-label">Date</span>
+                <span class="detail-value">${date.toLocaleDateString()}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Time</span>
+                <span class="detail-value">${date.toLocaleTimeString()}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Card Holder</span>
+                <span class="detail-value">${transaction.holderName || 'N/A'}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Card UID</span>
+                <span class="detail-value" style="font-family:monospace;">${transaction.uid || 'N/A'}</span>
+              </div>
+              ${itemsHtml}
+              <div class="total-row">
+                <span class="total-label">TOTAL PAID</span>
+                <span class="total-value">$${transaction.amount.toFixed(2)}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Balance Before</span>
+                <span class="detail-value">$${transaction.balanceBefore.toFixed(2)}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Balance After</span>
+                <span class="detail-value">$${transaction.balanceAfter.toFixed(2)}</span>
+              </div>
+            </div>
+            <div class="footer">
+              <p><strong>Thank you for using TAP & PAY</strong></p>
+              <p>Powered by Team RDF</p>
+              <p style="margin-top:15px;font-size:11px;">This is an automated receipt. Please do not reply to this email.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    });
+    
+    console.log(`✅ Receipt sent to ${email} for transaction ${transaction.receiptId}`);
+    
+    res.json({ 
+      success: true, 
+      message: `Receipt sent to ${email}`,
+      emailId: result.id
+    });
+  } catch (error) {
+    console.error('❌ Failed to send receipt email:', error);
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to send receipt email',
+      details: error.message 
+    });
+  }
+});

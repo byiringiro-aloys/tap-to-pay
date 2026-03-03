@@ -8,6 +8,7 @@ let isNewCard = false;
 let cart = [];
 let allProducts = [];
 let selectedCategory = 'all';
+let currentTransaction = null;
 const GRACE_PERIOD = 15000;
 let gracePeriodTimer = null;
 
@@ -117,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ==================== RECEIPT ====================
 function showReceipt(transaction) {
+    currentTransaction = transaction;
     const modal = document.getElementById('receipt-modal');
     const content = document.getElementById('receipt-content');
     const date = new Date(transaction.timestamp);
@@ -125,7 +127,9 @@ function showReceipt(transaction) {
     if (transaction.items && transaction.items.length > 0) {
         itemsHtml = `<div class="receipt-items"><h4>Items Purchased</h4>`;
         transaction.items.forEach(item => {
-            itemsHtml += `<div class="receipt-item-row"><span>${item.name} x${item.qty}</span><span>$${(item.price * item.qty).toFixed(2)}</span></div>`;
+            const qty = item.qty || item.quantity || 1;
+            const itemTotal = item.price * qty;
+            itemsHtml += `<div class="receipt-item-row"><span>${item.name} x${qty}</span><span>$${itemTotal.toFixed(2)}</span></div>`;
         });
         itemsHtml += '</div>';
     }
@@ -152,8 +156,25 @@ function showReceipt(transaction) {
     modal.style.display = 'flex';
 }
 
+
 function closeReceiptModal() { document.getElementById('receipt-modal').style.display = 'none'; }
-function printReceipt() { window.print(); }
+
+function printReceipt() { 
+    // Hide everything except the receipt modal for printing
+    const body = document.body;
+    const receiptModal = document.getElementById('receipt-modal');
+    
+    // Add print-only class to body
+    body.classList.add('printing-receipt');
+    
+    // Trigger print
+    window.print();
+    
+    // Remove print-only class after printing
+    setTimeout(() => {
+        body.classList.remove('printing-receipt');
+    }, 100);
+}
 
 // ==================== EDIT CARD MODAL ====================
 let editingCardUid = null;
@@ -199,5 +220,68 @@ async function saveCardChanges() {
         showToast('Failed to connect to server', 'error');
     } finally {
         btn.disabled = false; btn.textContent = 'Save Changes';
+    }
+}
+
+// ==================== TRANSACTION LIST RENDERING ====================
+function renderTxList(containerId, txs) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    if (!txs.length) { el.innerHTML = '<p class="empty-history">No transactions yet</p>'; return; }
+    el.innerHTML = txs.map(tx => {
+        const d = new Date(tx.timestamp);
+        const cls = tx.type === 'topup' ? 'topup' : 'debit';
+        const icon = tx.type === 'topup' ? '↑' : '↓';
+        const sign = tx.type === 'topup' ? '+' : '-';
+        const color = tx.type === 'topup' ? 'positive' : 'negative';
+
+        // Build description with items if available
+        let description = tx.description || tx.type;
+        if (tx.items && tx.items.length > 0) {
+            const itemsList = tx.items.map(item => `${item.name} (${item.qty || item.quantity || 1}x)`).join(', ');
+            description = `${tx.holderName} - ${itemsList}`;
+        } else {
+            description = `${tx.holderName} - ${description}`;
+        }
+
+        return `<div class="transaction-item ${cls}"><div class="transaction-icon">${icon}</div><div class="transaction-details"><div class="transaction-desc">${description}</div><div class="transaction-time">${d.toLocaleDateString()} ${d.toLocaleTimeString()}</div></div><div class="transaction-amount"><div class="amount-value ${color}">${sign}$${tx.amount.toFixed(2)}</div><div class="balance-after">Bal: $${tx.balanceAfter.toFixed(2)}</div></div></div>`;
+    }).join('');
+}
+
+// ==================== EMAIL RECEIPT ====================
+async function emailReceipt(transaction) {
+    if (!transaction.uid) {
+        showToast('Cannot send receipt: No card information', 'error');
+        return;
+    }
+
+    try {
+        // Get card details to get email
+        const cardRes = await fetch(`${BACKEND_URL}/card/${transaction.uid}`);
+        const card = await cardRes.json();
+
+        if (!card.email) {
+            showToast('Cannot send receipt: No email address on file', 'error');
+            return;
+        }
+
+        const res = await fetch(`${BACKEND_URL}/send-receipt`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: card.email,
+                transaction: transaction
+            })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            showToast(`Receipt sent to ${card.email}`, 'success');
+        } else {
+            showToast(data.error || 'Failed to send receipt', 'error');
+        }
+    } catch (err) {
+        console.error('Email receipt error:', err);
+        showToast('Failed to send receipt', 'error');
     }
 }
