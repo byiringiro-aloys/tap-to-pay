@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { Resend } = require('resend');
+const { generateReceiptEmail } = require('./email-template');
 require('dotenv').config();
 
 const app = express();
@@ -153,6 +154,32 @@ function generateReceiptId() {
   return `RCP-${timestamp}-${random}`;
 }
 
+/**
+ * Helper to send receipt emails
+ */
+async function sendReceiptEmail(email, transaction) {
+  if (!email || !transaction) return false;
+  if (!RESEND_API_KEY) {
+    console.warn('⚠️ Cannot send receipt email: RESEND_API_KEY not configured');
+    return false;
+  }
+
+  try {
+    const html = generateReceiptEmail(transaction);
+    const result = await resend.emails.send({
+      from: 'TAP & PAY <tap-to-pay@aloys.work>',
+      to: [email],
+      subject: `TAP & PAY Receipt - ${transaction.receiptId}`,
+      html: html
+    });
+    console.log(`✅ Receipt sent to ${email} for transaction ${transaction.receiptId}`);
+    return result;
+  } catch (error) {
+    console.error('❌ Failed to send receipt email:', error.message);
+    return false;
+  }
+}
+
 // JWT Middleware
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -272,7 +299,7 @@ app.post('/auth/login', async (req, res) => {
 
   try {
     const searchTerm = username.toLowerCase().trim();
-    
+
     // Try to find user by username or email
     // Build query conditions that handle empty emails
     const query = {
@@ -280,21 +307,21 @@ app.post('/auth/login', async (req, res) => {
         { username: searchTerm }
       ]
     };
-    
+
     // Only search by email if the search term looks like an email (contains @)
     if (searchTerm.includes('@')) {
       query.$or.push({ email: searchTerm });
     }
-    
+
     const user = await User.findOne(query);
-    
+
     if (!user) {
       return res.status(401).json({ error: 'Invalid username/email or password' });
     }
 
     // Check if password has been set
     if (!user.passwordSet || !user.password) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Password not set. Please use your setup link to set your password.',
         needsSetup: true,
         setupRequired: true
@@ -302,7 +329,7 @@ app.post('/auth/login', async (req, res) => {
     }
 
     const isValid = await verifyPassword(password, user.password);
-    
+
     if (!isValid) {
       return res.status(401).json({ error: 'Invalid username/email or password' });
     }
@@ -471,8 +498,8 @@ app.post('/auth/register', authenticateToken, requireRole('agent'), async (req, 
       // Continue even if email fails - return the link
     }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: `Salesperson ${fullName} created. Setup email sent to ${email}.`,
       setupUrl,
       username,
@@ -502,24 +529,24 @@ app.post('/auth/setup-password', async (req, res) => {
       console.error('MongoDB not connected');
       return res.status(500).json({ error: 'Database connection error. Please try again.' });
     }
-    
-    const user = await User.findOne({ 
-      setupToken: token, 
-      setupTokenExpiry: { $gt: new Date() } 
+
+    const user = await User.findOne({
+      setupToken: token,
+      setupTokenExpiry: { $gt: new Date() }
     });
 
     if (!user) {
       return res.status(400).json({ error: 'Invalid or expired setup link. Please contact your agent.' });
     }
-    
+
     const hashedPassword = await hashPassword(password);
-    
+
     // Update user document
     user.password = hashedPassword;
     user.passwordSet = true;
     user.setupToken = null;
     user.setupTokenExpiry = null;
-    
+
     const savedUser = await user.save();
 
     // Verify with fresh database query
@@ -530,8 +557,8 @@ app.post('/auth/setup-password', async (req, res) => {
       return res.status(500).json({ error: 'Failed to save password to database. Please contact support.' });
     }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'Password set successfully! You can now log in.',
       username: savedUser.username
     });
@@ -551,21 +578,21 @@ app.post('/auth/forgot-password', async (req, res) => {
 
   try {
     const searchTerm = username.toLowerCase().trim();
-    
+
     // Build query conditions that handle empty emails
     const query = {
       $or: [
         { username: searchTerm }
       ]
     };
-    
+
     // Only search by email if the search term looks like an email (contains @)
     if (searchTerm.includes('@')) {
       query.$or.push({ email: searchTerm });
     }
-    
+
     const user = await User.findOne(query);
-    
+
     if (!user) {
       // Don't reveal if user exists
       return res.json({ success: true, message: 'If the account exists, a reset link has been sent to the registered email address.' });
@@ -660,8 +687,8 @@ app.post('/auth/forgot-password', async (req, res) => {
 
     console.log(`\n🔑 RESET LINK for ${user.fullName} (${user.username}):\n${resetUrl}\n`);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'If the account exists, a reset link has been sent to the registered email address.'
     });
   } catch (err) {
@@ -683,9 +710,9 @@ app.post('/auth/reset-password', async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ 
-      resetToken: token, 
-      resetTokenExpiry: { $gt: new Date() } 
+    const user = await User.findOne({
+      resetToken: token,
+      resetTokenExpiry: { $gt: new Date() }
     });
 
     if (!user) {
@@ -719,9 +746,9 @@ app.post('/auth/change-password', async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ 
-      resetToken: token, 
-      resetTokenExpiry: { $gt: new Date() } 
+    const user = await User.findOne({
+      resetToken: token,
+      resetTokenExpiry: { $gt: new Date() }
     });
 
     if (!user) {
@@ -748,10 +775,10 @@ app.post('/auth/change-password', async (req, res) => {
 
     console.log(`✅ Password changed for ${user.username}`);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'Password changed successfully! You can now log in with your new password.',
-      username: user.username 
+      username: user.username
     });
   } catch (err) {
     console.error('Change password error:', err);
@@ -796,7 +823,7 @@ app.get('/auth/verify', authenticateToken, (req, res) => {
 // Test email endpoint (for debugging)
 app.post('/auth/test-email', authenticateToken, requireRole('agent'), async (req, res) => {
   const { email } = req.body;
-  
+
   if (!email) {
     return res.status(400).json({ error: 'Email address required' });
   }
@@ -831,20 +858,20 @@ app.post('/auth/test-email', authenticateToken, requireRole('agent'), async (req
         </html>
       `
     });
-    
+
     console.log(`✅ Test email sent to ${email}`);
     console.log(`📧 Email ID: ${result.id}`);
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: `Test email sent to ${email}`,
       emailId: result.id
     });
   } catch (error) {
     console.error('❌ Test email failed:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to send test email',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -892,6 +919,7 @@ app.post('/topup', async (req, res) => {
 
     await card.save();
 
+    const receiptId = generateReceiptId();
     const transaction = new Transaction({
       uid: card.uid,
       holderName: card.holderName,
@@ -900,9 +928,16 @@ app.post('/topup', async (req, res) => {
       balanceBefore: balanceBefore,
       balanceAfter: card.balance,
       description: `Top-up of $${amount.toFixed(2)}`,
-      processedBy: req.body.processedBy || 'system'
+      processedBy: req.body.processedBy || 'system',
+      receiptId: receiptId
     });
     await transaction.save();
+
+    // AUTO-EMAIL RECEIPT ON SUCCESS
+    if (card.email && card.email.trim() !== '') {
+      sendReceiptEmail(card.email, transaction.toObject ? transaction.toObject() : transaction)
+        .catch(emailErr => console.error('Background topup email failed:', emailErr));
+    }
 
     // Publish to MQTT
     const payload = JSON.stringify({ uid, amount: card.balance });
@@ -928,6 +963,7 @@ app.post('/topup', async (req, res) => {
         id: transaction._id,
         amount: transaction.amount,
         balanceAfter: transaction.balanceAfter,
+        receiptId: transaction.receiptId,
         timestamp: transaction.timestamp
       }
     });
@@ -1071,6 +1107,13 @@ app.post('/pay', async (req, res) => {
       receiptId: receiptId,
       timestamp: transaction.timestamp
     });
+
+    // AUTO-EMAIL RECEIPT ON SUCCESS
+    if (card.email && card.email.trim() !== '') {
+      // Send asynchronously - don't block the response
+      sendReceiptEmail(card.email, transaction.toObject ? transaction.toObject() : transaction)
+        .catch(emailErr => console.error('Background email failed:', emailErr));
+    }
 
     res.json({
       success: true,
@@ -1388,7 +1431,7 @@ async function seedDefaultUsers() {
       agentExists.forcePasswordChange = true;
       await agentExists.save();
     }
-    
+
   } catch (err) {
     console.error('Error seeding users:', err);
   }
@@ -1415,131 +1458,23 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`Access from: http://157.173.101.159:${PORT}`);
 });
 
-// Send receipt email
+// Send receipt email manually
 app.post('/send-receipt', async (req, res) => {
   const { email, transaction } = req.body;
-  
-  console.log(`📧 Receipt email request received for: ${email}`);
-  
+
   if (!email || !transaction) {
-    console.error('❌ Missing email or transaction data');
     return res.status(400).json({ error: 'Email and transaction data required' });
   }
 
-  if (!RESEND_API_KEY) {
-    console.error('❌ RESEND_API_KEY not configured');
-    return res.status(500).json({ error: 'Email service not configured' });
-  }
+  const result = await sendReceiptEmail(email, transaction);
 
-  console.log(`📧 Sending receipt for transaction ${transaction.receiptId} to ${email}`);
-
-  try {
-    const date = new Date(transaction.timestamp);
-    
-    // Build items HTML
-    let itemsHtml = '';
-    if (transaction.items && transaction.items.length > 0) {
-      itemsHtml = '<h3 style="color:#6366f1;margin-top:30px;">Items Purchased</h3><table style="width:100%;border-collapse:collapse;margin-top:15px;">';
-      transaction.items.forEach(item => {
-        const qty = item.qty || item.quantity || 1;
-        itemsHtml += `
-          <tr style="border-bottom:1px solid #e5e7eb;">
-            <td style="padding:10px 0;">${item.name} x${qty}</td>
-            <td style="padding:10px 0;text-align:right;font-weight:600;">$${(item.price * qty).toFixed(2)}</td>
-          </tr>`;
-      });
-      itemsHtml += '</table>';
-    }
-
-    const result = await resend.emails.send({
-      from: 'TAP & PAY <tap-to-pay@aloys.work>',
-      to: [email],
-      subject: `TAP & PAY Receipt - ${transaction.receiptId}`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <style>
-            body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f3f4f6; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 40px auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-            .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 40px 30px; text-align: center; color: white; }
-            .header h1 { margin: 0; font-size: 32px; font-weight: 800; }
-            .header p { margin: 8px 0 0 0; font-size: 14px; opacity: 0.9; }
-            .receipt-id { background: rgba(255,255,255,0.2); display: inline-block; padding: 8px 16px; border-radius: 6px; margin-top: 15px; font-family: monospace; font-size: 14px; }
-            .content { padding: 40px 30px; }
-            .detail-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
-            .detail-label { color: #6b7280; font-size: 14px; }
-            .detail-value { color: #111827; font-weight: 600; font-size: 14px; }
-            .total-row { display: flex; justify-content: space-between; padding: 20px 0; margin-top: 20px; border-top: 2px solid #6366f1; }
-            .total-label { color: #6366f1; font-size: 18px; font-weight: 700; }
-            .total-value { color: #6366f1; font-size: 24px; font-weight: 800; }
-            .footer { background: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 13px; }
-            .footer p { margin: 5px 0; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>TAP & PAY</h1>
-              <p>Payment Receipt</p>
-              <div class="receipt-id">${transaction.receiptId || 'N/A'}</div>
-            </div>
-            <div class="content">
-              <div class="detail-row">
-                <span class="detail-label">Date</span>
-                <span class="detail-value">${date.toLocaleDateString()}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Time</span>
-                <span class="detail-value">${date.toLocaleTimeString()}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Card Holder</span>
-                <span class="detail-value">${transaction.holderName || 'N/A'}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Card UID</span>
-                <span class="detail-value" style="font-family:monospace;">${transaction.uid || 'N/A'}</span>
-              </div>
-              ${itemsHtml}
-              <div class="total-row">
-                <span class="total-label">TOTAL PAID</span>
-                <span class="total-value">$${transaction.amount.toFixed(2)}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Balance Before</span>
-                <span class="detail-value">$${transaction.balanceBefore.toFixed(2)}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Balance After</span>
-                <span class="detail-value">$${transaction.balanceAfter.toFixed(2)}</span>
-              </div>
-            </div>
-            <div class="footer">
-              <p><strong>Thank you for using TAP & PAY</strong></p>
-              <p>Powered by Team RDF</p>
-              <p style="margin-top:15px;font-size:11px;">This is an automated receipt. Please do not reply to this email.</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `
-    });
-    
-    console.log(`✅ Receipt sent to ${email} for transaction ${transaction.receiptId}`);
-    
-    res.json({ 
-      success: true, 
+  if (result) {
+    res.json({
+      success: true,
       message: `Receipt sent to ${email}`,
       emailId: result.id
     });
-  } catch (error) {
-    console.error('❌ Failed to send receipt email:', error);
-    console.error('Error details:', error.message);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({ 
-      error: 'Failed to send receipt email',
-      details: error.message 
-    });
+  } else {
+    res.status(500).json({ error: 'Failed to send receipt email' });
   }
 });

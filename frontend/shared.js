@@ -125,32 +125,73 @@ function showReceipt(transaction) {
 
     let itemsHtml = '';
     if (transaction.items && transaction.items.length > 0) {
-        itemsHtml = `<div class="receipt-items"><h4>Items Purchased</h4>`;
-        transaction.items.forEach(item => {
+        itemsHtml = `
+        <div class="receipt-divider"></div>
+        <div class="receipt-section">
+            <h4 class="receipt-section-title">ITEMS PURCHASED</h4>
+            <div class="receipt-items-list">
+                ${transaction.items.map(item => {
             const qty = item.qty || item.quantity || 1;
             const itemTotal = item.price * qty;
-            itemsHtml += `<div class="receipt-item-row"><span>${item.name} x${qty}</span><span>$${itemTotal.toFixed(2)}</span></div>`;
-        });
-        itemsHtml += '</div>';
+            return `
+                    <div class="receipt-item-line">
+                        <div class="item-name-qty">
+                            <span class="item-name">${item.name}</span>
+                            <span class="item-qty">x${qty}</span>
+                        </div>
+                        <span class="item-price">$${itemTotal.toFixed(2)}</span>
+                    </div>`;
+        }).join('')}
+            </div>
+        </div>`;
     }
 
     content.innerHTML = `
     <div class="receipt-paper">
+      <div class="receipt-paid-badge">PAID</div>
+      
       <div class="receipt-header">
-        <h2>TAP & PAY</h2>
-        <p>RFID Payment Receipt</p>
-        <div class="receipt-id">${transaction.receiptId || 'N/A'}</div>
+        <div class="receipt-logo">
+            <svg width="48" height="48" viewBox="0 0 40 40" fill="none">
+                <rect width="40" height="40" rx="12" fill="#1a1a2e" />
+                <path d="M12 16H28M12 22H22M16 28H28" stroke="white" stroke-width="2.5" stroke-linecap="round" />
+                <circle cx="28" cy="28" r="6" fill="#10b981" stroke="white" stroke-width="2" />
+            </svg>
+        </div>
+        <h2 class="receipt-brand">TAP & PAY</h2>
+        <p class="receipt-tagline">Secure RFID Cashless Payment</p>
+        <div class="receipt-id-tag">#${transaction.receiptId || 'TRANS-ID'}</div>
       </div>
-      <div class="receipt-detail-row"><span>Date</span><span>${date.toLocaleDateString()}</span></div>
-      <div class="receipt-detail-row"><span>Time</span><span>${date.toLocaleTimeString()}</span></div>
-      <div class="receipt-detail-row"><span>Card Holder</span><span>${transaction.holderName || 'N/A'}</span></div>
-      <div class="receipt-detail-row"><span>Card UID</span><span>${transaction.uid || 'N/A'}</span></div>
+
+      <div class="receipt-divider"></div>
+
+      <div class="receipt-details">
+        <div class="receipt-row"><span>DATE</span><span>${date.toLocaleDateString()}</span></div>
+        <div class="receipt-row"><span>TIME</span><span>${date.toLocaleTimeString()}</span></div>
+        <div class="receipt-row"><span>HOLDER</span><span>${transaction.holderName || 'N/A'}</span></div>
+        <div class="receipt-row"><span>CARD UID</span><span class="receipt-mono">${transaction.uid || 'N/A'}</span></div>
+      </div>
+
       ${itemsHtml}
-      <div class="receipt-total-row"><span>TOTAL PAID</span><span>$${transaction.amount.toFixed(2)}</span></div>
-      <div class="receipt-detail-row"><span>Balance Before</span><span>$${transaction.balanceBefore.toFixed(2)}</span></div>
-      <div class="receipt-detail-row"><span>Balance After</span><span>$${transaction.balanceAfter.toFixed(2)}</span></div>
+
+      <div class="receipt-divider"></div>
+
+      <div class="receipt-total-section">
+        <div class="receipt-total-row">
+            <span>TOTAL AMOUNT</span>
+            <span class="total-value">$${transaction.amount.toFixed(2)}</span>
+        </div>
+        <div class="receipt-balance-info">
+            <div class="balance-row"><span>Previous Balance</span><span>$${transaction.balanceBefore.toFixed(2)}</span></div>
+            <div class="balance-row"><span>Remaining Balance</span><span class="new-balance">$${transaction.balanceAfter.toFixed(2)}</span></div>
+        </div>
+      </div>
+
       <div class="receipt-footer">
-        <p>Thank you for using TAP & PAY<br>Powered by Team RDF</p>
+        <div class="receipt-barcode">|| ||| || ||| || || |||</div>
+        <p>Thank you for your purchase!</p>
+        <p class="team-credit">Powered by Team RDF • Verified Secure</p>
+        <div class="receipt-timestamp-small">Printed at ${new Date().toLocaleString()}</div>
       </div>
     </div>`;
     modal.style.display = 'flex';
@@ -159,20 +200,33 @@ function showReceipt(transaction) {
 
 function closeReceiptModal() { document.getElementById('receipt-modal').style.display = 'none'; }
 
-function printReceipt() { 
-    // Hide everything except the receipt modal for printing
-    const body = document.body;
-    const receiptModal = document.getElementById('receipt-modal');
-    
-    // Add print-only class to body
-    body.classList.add('printing-receipt');
-    
-    // Trigger print
-    window.print();
-    
-    // Remove print-only class after printing
+function printReceipt() {
+    if (!currentTransaction) {
+        showToast('No transaction data available', 'error');
+        return;
+    }
+
+    // Set document title for print filename
+    const originalTitle = document.title;
+    const date = new Date(currentTransaction.timestamp);
+    const dateStr = date.getFullYear() + '-' + (date.getMonth() + 1).toString().padStart(2, '0') + '-' + date.getDate().toString().padStart(2, '0');
+    const holderName = (currentTransaction.holderName || 'Customer').trim().replace(/\s+/g, '_');
+    const receiptId = currentTransaction.receiptId || 'TRANS';
+
+    // Format: Receipt_John_Doe_2026-03-04_RCP12345
+    const printTitle = `Receipt_${holderName}_${dateStr}_${receiptId}`;
+    document.title = printTitle;
+
+    // Some browsers need a slight delay to update the title in the print dialog
+    // We also hide the UI elements more aggressively via classes if needed
+    window.focus();
+
     setTimeout(() => {
-        body.classList.remove('printing-receipt');
+        window.print();
+        // Restore title after a longer delay to ensure the dialog is gone
+        setTimeout(() => {
+            document.title = originalTitle;
+        }, 1000);
     }, 100);
 }
 
