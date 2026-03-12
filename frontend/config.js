@@ -4,8 +4,8 @@ const config = {
   getBackendUrl: function() {
     // Check if running in React Native/Expo environment
     if (typeof window === 'undefined' || !window.location) {
-      // Mobile app - use production VPS server
-      return 'http://157.173.101.159:8208';
+      // Mobile app - use production server
+      return 'https://tapandpay-backend.onrender.com';
     }
     
     const hostname = window.location.hostname;
@@ -15,8 +15,8 @@ const config = {
       return 'http://localhost:8208';
     }
     
-    // If running on production VPS
-    return 'http://157.173.101.159:8208';
+    // If running on production
+    return 'https://tapandpay-backend.onrender.com';
   }
 };
 

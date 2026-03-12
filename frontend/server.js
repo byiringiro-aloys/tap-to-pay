@@ -15,5 +15,5 @@ app.get('/', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Frontend server running on http://0.0.0.0:${PORT}`);
   console.log(`Access locally: http://localhost:${PORT}`);
-  console.log(`Access from VPS: http://157.173.101.159:${PORT}`);
+  console.log(`Access from Production: https://tapandpay-backend.onrender.com`);
 });
