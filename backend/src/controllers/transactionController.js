@@ -186,7 +186,7 @@ const pay = async (req, res) => {
           return res.status(400).json({ error: `Product not found: ${prodId}` });
         }
 
-        const qty = item.quantity || 1;
+        const qty = item.quantity || item.qty || 1;
         if (product.stock < qty) {
           await session.abortTransaction();
           session.endSession();

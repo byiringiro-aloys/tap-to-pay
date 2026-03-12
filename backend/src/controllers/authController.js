@@ -60,7 +60,7 @@ const login = async (req, res) => {
     await user.save();
 
     const token = jwt.sign(
-      { id: user._id, username: user.username, fullName: user.fullName, role: user.role },
+      { id: user._id, username: user.username, fullName: user.fullName, role: user.role, email: user.email },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -72,6 +72,7 @@ const login = async (req, res) => {
         id: user._id,
         username: user.username,
         fullName: user.fullName,
+        email: user.email,
         role: user.role,
         lastLogin: user.lastLogin
       }
@@ -339,8 +340,28 @@ const deleteUser = async (req, res) => {
   }
 };
 
-const verify = (req, res) => {
-  res.json({ valid: true, user: req.user });
+const verify = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password -setupToken -resetToken');
+    if (!user) {
+      return res.json({ valid: false });
+    }
+    
+    res.json({ 
+      valid: true, 
+      user: {
+        id: user._id,
+        username: user.username,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        lastLogin: user.lastLogin
+      } 
+    });
+  } catch (err) {
+    console.error('Verify error:', err);
+    res.status(500).json({ valid: false });
+  }
 };
 
 module.exports = {
