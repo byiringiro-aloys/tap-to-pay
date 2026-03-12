@@ -1,33 +1,104 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/context/AuthContext';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() ?? 'light';
+  const theme = Colors[colorScheme];
+  const { user } = useAuth();
+
+  const isAgent = user?.role === 'agent';
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: theme.tabIconDefault,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarStyle: {
+          backgroundColor: theme.background,
+          borderTopColor: theme.border,
+          height: 60,
+          paddingBottom: 8,
+        },
       }}>
+      {/* ===== SHARED: Home tab ===== */}
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="house.fill" color={color} />,
         }}
       />
+
+      {/* ===== SALESPERSON ONLY: Sales tab ===== */}
+      <Tabs.Screen
+        name="sales"
+        options={{
+          title: 'Sales',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="cart.fill" color={color} />,
+          href: isAgent ? null : '/(tabs)/sales',
+        }}
+      />
+
+      {/* ===== AGENT ONLY: Cards tab (Holders, Top-Up, Register) ===== */}
+      <Tabs.Screen
+        name="cards"
+        options={{
+          title: 'Cards',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="card.fill" color={color} />,
+          href: isAgent ? '/(tabs)/cards' : null,
+        }}
+      />
+
+      {/* ===== AGENT ONLY: Stock/Inventory tab ===== */}
+      <Tabs.Screen
+        name="stock"
+        options={{
+          title: 'Stock',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="cube.fill" color={color} />,
+          href: isAgent ? ('/(tabs)/stock' as any) : null,
+        }}
+      />
+
+      {/* ===== AGENT ONLY: Users Management tab ===== */}
+      <Tabs.Screen
+        name="users"
+        options={{
+          title: 'Team',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.2.fill" color={color} />,
+          href: isAgent ? ('/(tabs)/users' as any) : null,
+        }}
+      />
+
+      {/* ===== SHARED: History tab ===== */}
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: 'History',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="clock.fill" color={color} />,
+        }}
+      />
+
+      {/* ===== SHARED: Profile tab ===== */}
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.fill" color={color} />,
+        }}
+      />
+
+      {/* ===== HIDDEN: Explore (template screen, not needed) ===== */}
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          href: null,
         }}
       />
     </Tabs>
