@@ -127,8 +127,8 @@ export const productService = {
 
 // ==================== CARD SERVICES ====================
 export const cardService = {
-  getCards: () => fetch(`${API_BASE_URL}/cards`).then(handleResponse),
-  getCard: (uid: string) => fetch(`${API_BASE_URL}/card/${uid}`).then(handleResponse),
+  getCards: () => authRequest('/cards'),
+  getCard: (uid: string) => authRequest(`/card/${uid}`),
   
   updateCard: (uid: string, data: any) => authRequest(`/card/${uid}`, {
     method: 'PUT',
@@ -152,8 +152,8 @@ export const cardService = {
 
 // ==================== TRANSACTION SERVICES ====================
 export const transactionService = {
-  getTransactions: () => fetch(`${API_BASE_URL}/transactions`).then(handleResponse),
-  getUserTransactions: (uid: string) => fetch(`${API_BASE_URL}/transactions/${uid}`).then(handleResponse),
+  getTransactions: () => authRequest('/transactions'),
+  getUserTransactions: (uid: string) => authRequest(`/transactions/${uid}`),
   
   pay: (payload: any) => 
     fetch(`${API_BASE_URL}/pay`, {
@@ -182,5 +182,5 @@ export const userService = {
 
 // ==================== STATS SERVICES ====================
 export const statsService = {
-  getStats: () => fetch(`${API_BASE_URL}/stats`).then(handleResponse),
+  getStats: () => authRequest('/stats'),
 };

@@ -2,28 +2,30 @@ import React, { useState } from 'react';
 import {
   StyleSheet,
   View,
-  TextInput,
-  TouchableOpacity,
   Text,
   KeyboardAvoidingView,
   Platform,
   Image,
-  ActivityIndicator,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 import { authService } from '@/services/api';
-import { Colors } from '@/constants/theme';
+import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { PremiumButton } from '@/components/ui/PremiumButton';
+import { PremiumInput } from '@/components/ui/PremiumInput';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+
+const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   
   const { login } = useAuth();
   const colorScheme = useColorScheme() ?? 'light';
@@ -48,82 +50,86 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <LinearGradient
         colors={[theme.primary, theme.secondary]}
-        style={styles.headerGradient}
+        style={styles.backgroundGradient}
       >
-        <View style={styles.logoContainer}>
+        <View style={styles.circle1} />
+        <View style={styles.circle2} />
+      </LinearGradient>
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <View style={styles.content}>
+          <Animated.View 
+            entering={FadeInUp.delay(200).duration(1000)}
+            style={styles.logoContainer}
+          >
             <View style={styles.logoCircle}>
-                <Ionicons name="card" size={50} color="white" />
+              <Image 
+                source={require('@/assets/images/app-logo.png')} 
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
             </View>
             <Text style={styles.appName}>TAP & PAY</Text>
             <Text style={styles.appTagline}>Secure RFID Payment System</Text>
-        </View>
-      </LinearGradient>
+          </Animated.View>
 
-      <View style={[styles.formContainer, { backgroundColor: theme.background }]}>
-        <Text style={[styles.title, { color: theme.text }]}>Welcome Back</Text>
-        <Text style={[styles.subtitle, { color: theme.muted }]}>Sign in to your account</Text>
+          <Animated.View 
+            entering={FadeInDown.delay(400).duration(1000)}
+            style={[styles.formContainer, { backgroundColor: theme.card }]}
+          >
+            <Text style={[styles.title, { color: theme.text }]}>Welcome Back</Text>
+            <Text style={[styles.subtitle, { color: theme.muted }]}>Sign in to your account</Text>
 
-        <View style={styles.inputGroup}>
-          <Text style={[styles.label, { color: theme.text }]}>Username or Email</Text>
-          <View style={[styles.inputWrapper, { borderColor: theme.border, backgroundColor: colorScheme === 'dark' ? theme.card : '#f1f5f9' }]}>
-            <Ionicons name="person-outline" size={20} color={theme.icon} style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, { color: theme.text }]}
-              placeholder="Username"
-              placeholderTextColor={theme.muted}
+            <PremiumInput
+              label="Username or Email"
+              placeholder="Enter your username"
               value={username}
               onChangeText={setUsername}
-              autoCapitalize="none"
+              icon="person-outline"
             />
-          </View>
-        </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={[styles.label, { color: theme.text }]}>Password</Text>
-          <View style={[styles.inputWrapper, { borderColor: theme.border, backgroundColor: colorScheme === 'dark' ? theme.card : '#f1f5f9' }]}>
-            <Ionicons name="lock-closed-outline" size={20} color={theme.icon} style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, { color: theme.text }]}
-              placeholder="Password"
-              placeholderTextColor={theme.muted}
+            <PremiumInput
+              label="Password"
+              placeholder="Enter your password"
               value={password}
               onChangeText={setPassword}
-              secureTextEntry={!showPassword}
+              icon="lock-closed-outline"
+              secureTextEntry
             />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-              <Ionicons name={showPassword ? "eye-off" : "eye"} size={20} color={theme.icon} />
-            </TouchableOpacity>
-          </View>
+
+            <View style={styles.forgotPasswordContainer}>
+              <PremiumButton
+                title="Forgot Password?"
+                variant="ghost"
+                size="sm"
+                onPress={() => router.push('/forgot')}
+                textStyle={{ color: theme.primary }}
+              />
+            </View>
+
+            <PremiumButton
+              title="Sign In"
+              onPress={handleLogin}
+              loading={loading}
+              gradient
+              style={styles.loginButton}
+            />
+
+            <View style={styles.footer}>
+              <Text style={[styles.footerText, { color: theme.muted }]}>
+                Contact administrator for access request
+              </Text>
+            </View>
+          </Animated.View>
         </View>
-
-        <TouchableOpacity style={styles.forgotPassword} onPress={() => router.push('/forgot')}>
-          <Text style={{ color: theme.primary, fontWeight: '600' }}>Forgot Password?</Text>
-        </TouchableOpacity>
-
-
-        <TouchableOpacity
-          style={[styles.loginButton, { backgroundColor: theme.primary }]}
-          onPress={handleLogin}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.loginButtonText}>Sign In</Text>
-          )}
-        </TouchableOpacity>
-
-        <View style={styles.footer}>
-          <Text style={{ color: theme.muted }}>Contact administrator for access</Text>
-        </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -131,28 +137,59 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  headerGradient: {
-    height: '40%',
+  backgroundGradient: {
+    ...StyleSheet.absoluteFillObject,
+    height: height * 0.5,
+  },
+  circle1: {
+    position: 'absolute',
+    top: -50,
+    right: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  circle2: {
+    position: 'absolute',
+    top: 100,
+    left: -80,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: Spacing.xl,
     justifyContent: 'center',
-    alignItems: 'center',
   },
   logoContainer: {
     alignItems: 'center',
+    marginBottom: Spacing.xxl,
   },
   logoCircle: {
     width: 100,
     height: 100,
-    borderRadius: 50,
+    borderRadius: 30,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.4)',
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   appName: {
-    fontSize: 32,
-    fontWeight: '800',
+    fontSize: 36,
+    fontWeight: '900',
     color: 'white',
     letterSpacing: 1,
   },
@@ -160,79 +197,44 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 4,
+    fontWeight: '500',
   },
   formContainer: {
-    flex: 1,
-    marginTop: -30,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    padding: 32,
-    elevation: 8,
+    borderRadius: 32,
+    padding: Spacing.xl,
+    width: '100%',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
-    shadowRadius: 10,
+    shadowRadius: 20,
+    elevation: 10,
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 8,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    marginBottom: 32,
+    marginBottom: Spacing.xl,
+    fontWeight: '500',
   },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    height: 56,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    height: '100%',
-  },
-  eyeIcon: {
-    padding: 8,
-  },
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    marginBottom: 32,
+  forgotPasswordContainer: {
+    alignItems: 'flex-end',
+    marginBottom: Spacing.xl,
+    marginTop: -8,
   },
   loginButton: {
-    height: 56,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  loginButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '700',
+    marginTop: Spacing.md,
   },
   footer: {
-    marginTop: 'auto',
+    marginTop: Spacing.xl,
     alignItems: 'center',
-    paddingBottom: 16,
+  },
+  footerText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
 });
+
