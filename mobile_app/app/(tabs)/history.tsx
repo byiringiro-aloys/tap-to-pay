@@ -40,6 +40,7 @@ export default function HistoryScreen() {
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
+  const [filterType, setFilterType] = useState<'all' | 'debit' | 'topup'>('all');
 
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
@@ -64,20 +65,20 @@ export default function HistoryScreen() {
   );
 
   const sortedTransactions = useMemo(() => {
-    return [...transactions].sort((a, b) => {
-      // Primary Sort: Type (debit/Purchases first, then topup)
-      if (a.type !== b.type) {
-        return a.type === 'debit' ? -1 : 1;
-      }
+    let filtered = transactions;
+    if (filterType !== 'all') {
+      filtered = transactions.filter(t => t.type === filterType);
+    }
 
-      // Secondary Sort: Based on user selection
+    return filtered.sort((a, b) => {
+      // Sort: Based on user selection
       if (sortBy === 'date-desc') return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
       if (sortBy === 'date-asc') return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
       if (sortBy === 'amount-desc') return b.amount - a.amount;
       if (sortBy === 'amount-asc') return a.amount - b.amount;
       return 0;
     });
-  }, [transactions, sortBy]);
+  }, [transactions, sortBy, filterType]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -162,6 +163,24 @@ export default function HistoryScreen() {
       />
 
       <View style={styles.sortContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.sortContent, { marginBottom: 12 }]}>
+          <FilterChip 
+            label="All Types" 
+            active={filterType === 'all'} 
+            onPress={() => setFilterType('all')} 
+          />
+          <FilterChip 
+            label="Purchases" 
+            active={filterType === 'debit'} 
+            onPress={() => setFilterType('debit')} 
+          />
+          <FilterChip 
+            label="Top-ups" 
+            active={filterType === 'topup'} 
+            onPress={() => setFilterType('topup')} 
+          />
+        </ScrollView>
+
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortContent}>
           <SortChip 
             label="Newest" 
@@ -280,6 +299,31 @@ export default function HistoryScreen() {
   );
 }
 
+function FilterChip({ label, active, onPress }: any) {
+  const colorScheme = useColorScheme() ?? 'light';
+  const theme = Colors[colorScheme];
+  
+  return (
+    <TouchableOpacity 
+      onPress={() => {
+        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      style={[
+        styles.filterChip, 
+        { 
+          backgroundColor: active ? theme.primary : theme.card,
+          borderColor: active ? theme.primary : theme.border,
+        },
+      ]}
+    >
+      <Text style={[styles.filterChipText, { color: active ? 'white' : theme.text }]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 function SortChip({ label, active, onPress, icon }: any) {
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
@@ -348,6 +392,16 @@ const styles = StyleSheet.create({
   sortContent: {
     paddingHorizontal: 20,
     gap: 10,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+  },
+  filterChipText: {
+    fontSize: 14,
+    fontWeight: '800',
   },
   sortChip: {
     flexDirection: 'row',

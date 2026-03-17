@@ -234,7 +234,12 @@ export default function SalesScreen() {
     });
 
   const CardView = () => (
-    <Animated.View entering={FadeInDown.duration(600)} style={styles.sectionContent}>
+    <Animated.ScrollView 
+        entering={FadeInDown.duration(600)} 
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.sectionContent}
+        showsVerticalScrollIndicator={false}
+    >
         <View style={styles.cardPreviewContainer}>
             <LinearGradient
                 colors={['#1e293b', '#0f172a']}
@@ -293,7 +298,7 @@ export default function SalesScreen() {
                 </View>
             )}
         </PremiumCard>
-    </Animated.View>
+    </Animated.ScrollView>
   );
 
   const MarketplaceView = () => (
@@ -762,7 +767,7 @@ const styles = StyleSheet.create({
   tabLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '800', marginLeft: 8 },
   
   // Card View
-  sectionContent: { flex: 1, padding: Spacing.lg },
+  sectionContent: { padding: Spacing.lg, paddingBottom: 120 },
   cardPreviewContainer: { marginBottom: Spacing.xl },
   visualCard: { 
     height: 200, 
@@ -1065,4 +1070,3 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
-

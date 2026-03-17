@@ -3,6 +3,7 @@ import {
   StyleSheet,
   View,
   Text,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
   Image,
@@ -63,71 +64,77 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <View style={styles.content}>
-          <Animated.View 
-            entering={FadeInUp.delay(200).duration(1000)}
-            style={styles.logoContainer}
-          >
-            <View style={styles.logoCircle}>
-              <Image 
-                source={require('@/assets/images/app-logo.png')} 
-                style={styles.logoImage}
-                resizeMode="contain"
+        <ScrollView 
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.content}>
+            <Animated.View 
+              entering={FadeInUp.delay(200).duration(1000)}
+              style={styles.logoContainer}
+            >
+              <View style={styles.logoCircle}>
+                <Image 
+                  source={require('@/assets/images/app-logo.png')} 
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text style={styles.appName}>TAP & PAY</Text>
+              <Text style={styles.appTagline}>Secure RFID Payment System</Text>
+            </Animated.View>
+
+            <Animated.View 
+              entering={FadeInDown.delay(400).duration(1000)}
+              style={[styles.formContainer, { backgroundColor: theme.card }]}
+            >
+              <Text style={[styles.title, { color: theme.text }]}>Welcome Back</Text>
+              <Text style={[styles.subtitle, { color: theme.muted }]}>Sign in to your account</Text>
+
+              <PremiumInput
+                label="Username or Email"
+                placeholder="Enter your username"
+                value={username}
+                onChangeText={setUsername}
+                icon="person-outline"
               />
-            </View>
-            <Text style={styles.appName}>TAP & PAY</Text>
-            <Text style={styles.appTagline}>Secure RFID Payment System</Text>
-          </Animated.View>
 
-          <Animated.View 
-            entering={FadeInDown.delay(400).duration(1000)}
-            style={[styles.formContainer, { backgroundColor: theme.card }]}
-          >
-            <Text style={[styles.title, { color: theme.text }]}>Welcome Back</Text>
-            <Text style={[styles.subtitle, { color: theme.muted }]}>Sign in to your account</Text>
+              <PremiumInput
+                label="Password"
+                placeholder="Enter your password"
+                value={password}
+                onChangeText={setPassword}
+                icon="lock-closed-outline"
+                secureTextEntry
+              />
 
-            <PremiumInput
-              label="Username or Email"
-              placeholder="Enter your username"
-              value={username}
-              onChangeText={setUsername}
-              icon="person-outline"
-            />
+              <View style={styles.forgotPasswordContainer}>
+                <PremiumButton
+                  title="Forgot Password?"
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => router.push('/forgot')}
+                  textStyle={{ color: theme.primary }}
+                />
+              </View>
 
-            <PremiumInput
-              label="Password"
-              placeholder="Enter your password"
-              value={password}
-              onChangeText={setPassword}
-              icon="lock-closed-outline"
-              secureTextEntry
-            />
-
-            <View style={styles.forgotPasswordContainer}>
               <PremiumButton
-                title="Forgot Password?"
-                variant="ghost"
-                size="sm"
-                onPress={() => router.push('/forgot')}
-                textStyle={{ color: theme.primary }}
+                title="Sign In"
+                onPress={handleLogin}
+                loading={loading}
+                gradient
+                style={styles.loginButton}
               />
-            </View>
 
-            <PremiumButton
-              title="Sign In"
-              onPress={handleLogin}
-              loading={loading}
-              gradient
-              style={styles.loginButton}
-            />
-
-            <View style={styles.footer}>
-              <Text style={[styles.footerText, { color: theme.muted }]}>
-                Contact administrator for access request
-              </Text>
-            </View>
-          </Animated.View>
-        </View>
+              <View style={styles.footer}>
+                <Text style={[styles.footerText, { color: theme.muted }]}>
+                  Contact administrator for access request
+                </Text>
+              </View>
+            </Animated.View>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -163,9 +170,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
     paddingHorizontal: Spacing.xl,
-    justifyContent: 'center',
+    paddingTop: Spacing.xxl,
+    paddingBottom: Spacing.xxl,
   },
   logoContainer: {
     alignItems: 'center',
@@ -237,4 +244,3 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
-

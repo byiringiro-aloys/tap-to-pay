@@ -21,13 +21,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { PremiumCard } from '@/components/ui/PremiumCard';
 import { PremiumButton } from '@/components/ui/PremiumButton';
 import { PremiumHeader } from '@/components/ui/PremiumHeader';
-import Animated, { 
-  FadeInDown, 
+import Animated, {
+  FadeInDown,
   FadeInRight,
   FadeInUp,
-  useAnimatedStyle, 
-  useSharedValue, 
-  withSpring 
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
@@ -62,7 +62,7 @@ export default function DashboardScreen() {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      
+
       // Independent fetches to prevent cascading failures
       let backendData: any = {};
       try {
@@ -78,17 +78,17 @@ export default function DashboardScreen() {
       } catch (err) {
         console.warn('Transactions fetch failed:', err);
       }
-      
+
       const now = new Date();
       const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      
+
       // Filter transactions based on role
-      const personalTxs = isAgent 
-        ? txs 
-        : txs.filter((t: any) => 
-            t.processedBy === user?.username || 
-            t.processedBy === user?.email
-          );
+      const personalTxs = isAgent
+        ? txs
+        : txs.filter((t: any) =>
+          t.processedBy === user?.username ||
+          t.processedBy === user?.email
+        );
 
       // 1. Transaction Counts
       const totalCount = personalTxs.length;
@@ -101,7 +101,7 @@ export default function DashboardScreen() {
 
       const allDebit = personalTxs.filter((t: any) => t.type === 'debit');
       const totalVol = allDebit.reduce((sum: number, t: any) => sum + t.amount, 0);
-      
+
       const allTopup = personalTxs.filter((t: any) => t.type === 'topup');
       const totalTopup = allTopup.reduce((sum: number, t: any) => sum + t.amount, 0);
 
@@ -119,18 +119,18 @@ export default function DashboardScreen() {
 
       const maxWeekVal = Math.max(...weekData, 1000);
       const normalizedTrend = weekData.map(v => (v / maxWeekVal) * 100 + 15);
-      
+
       setStats({
         ...backendData,
         totalTransactions: totalCount,
         todayTransactions: todayCount,
-        purchaseVolume: isAgent ? totalVol : todayVol, 
+        purchaseVolume: isAgent ? totalVol : todayVol,
         topupVolume: totalTopup,
         totalRevenue: totalVol,
         activeCards: backendData.activeCards || 0,
         totalCards: backendData.totalCards || 0
       });
-      
+
       setWeeklyTrend(normalizedTrend);
 
       // Growth Indicator logic
@@ -140,10 +140,10 @@ export default function DashboardScreen() {
       const yVol = weekData[prevDay] > 0 ? weekData[prevDay] : 1;
       const diffPercent = ((tVol - yVol) / yVol) * 100;
       setTrendPercent(`${diffPercent >= 0 ? '+' : ''}${diffPercent.toFixed(1)}%`);
-      
-      setSysStatus(prev => ({ 
-        ...prev, 
-        api: (backendData?.totalCards || txs.length) ? 'online' : 'offline' 
+
+      setSysStatus(prev => ({
+        ...prev,
+        api: (backendData?.totalCards || txs.length) ? 'online' : 'offline'
       }));
     } catch (error) {
       console.error('Stats overview error:', error);
@@ -186,11 +186,11 @@ export default function DashboardScreen() {
       <View style={[styles.statusDot, { backgroundColor: status === 'online' ? theme.success : theme.danger }]} />
       <Text style={[styles.statusLabelText, { color: theme.text }]}>{label}</Text>
       <View style={[
-        styles.statusBadge, 
+        styles.statusBadge,
         { backgroundColor: status === 'online' ? theme.success + '15' : theme.danger + '15' }
       ]}>
         <Text style={[
-          styles.statusValueText, 
+          styles.statusValueText,
           { color: status === 'online' ? theme.success : theme.danger }
         ]}>
           {status === 'online' ? 'Stable' : 'Offline'}
@@ -209,7 +209,7 @@ export default function DashboardScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <PremiumHeader 
+      <PremiumHeader
         title={`Hello, ${user?.fullName?.split(' ')[0]} 👋`}
         subtitle={isAgent ? 'Administrator Dashboard' : 'Sales Overview'}
         gradient
@@ -242,17 +242,17 @@ export default function DashboardScreen() {
                 <Text style={styles.headerBadgeText}>Live</Text>
               </View>
             </View>
-            
+
             <Text style={styles.revenueValue}>
               Frw {stats?.purchaseVolume?.toLocaleString() || '0'}
             </Text>
-            
+
             <View style={styles.revenueFooter}>
               <View style={styles.revenueTrend}>
-                <Ionicons 
-                  name={trendPercent.startsWith('+') ? "trending-up" : "trending-down"} 
-                  size={16} 
-                  color={trendPercent.startsWith('+') ? "#4ade80" : "#f87171"} 
+                <Ionicons
+                  name={trendPercent.startsWith('+') ? "trending-up" : "trending-down"}
+                  size={16}
+                  color={trendPercent.startsWith('+') ? "#4ade80" : "#f87171"}
                 />
                 <Text style={styles.trendText}>{trendPercent} from yesterday</Text>
               </View>
@@ -314,7 +314,7 @@ export default function DashboardScreen() {
               <Text style={{ color: theme.primary, fontWeight: '600' }}>View Details</Text>
             </TouchableOpacity>
           </View>
-          
+
           <PremiumCard style={styles.chartCard}>
             <View style={styles.chartHeader}>
               <View>
@@ -326,20 +326,20 @@ export default function DashboardScreen() {
                 <Text style={[styles.legendText, { color: theme.muted }]}>Volume</Text>
               </View>
             </View>
-            
+
             <View style={styles.chartBarContainer}>
               {(weeklyTrend.length > 0 ? weeklyTrend : [45, 60, 85, 30, 95, 70, 55]).map((val, i) => (
                 <View key={i} style={styles.chartBarWrapper}>
                   <View style={styles.barBackground}>
-                    <Animated.View 
+                    <Animated.View
                       entering={FadeInUp.delay(i * 100).duration(1000)}
                       style={[
-                        styles.chartBar, 
-                        { 
+                        styles.chartBar,
+                        {
                           height: val,
-                          backgroundColor: i === new Date().getDay() - 1 ? theme.secondary : theme.primary 
+                          backgroundColor: i === new Date().getDay() - 1 ? theme.secondary : theme.primary
                         }
-                      ]} 
+                      ]}
                     />
                   </View>
                   <Text style={[styles.chartBarLabel, { color: theme.muted }]}>
@@ -355,7 +355,7 @@ export default function DashboardScreen() {
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>⚡ Quick Actions</Text>
             <View style={styles.quickActions}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.actionItem}
                 onPress={() => router.push('/(tabs)/sales')}
               >
@@ -367,8 +367,8 @@ export default function DashboardScreen() {
                 </LinearGradient>
                 <Text style={[styles.actionLabel, { color: theme.text }]}>New Sale</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.actionItem}
                 onPress={() => router.push('/(tabs)/history')}
               >
@@ -378,7 +378,7 @@ export default function DashboardScreen() {
                 <Text style={[styles.actionLabel, { color: theme.text }]}>History</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.actionItem}
                 onPress={() => router.push('/(tabs)/profile')}
               >
@@ -407,17 +407,17 @@ export default function DashboardScreen() {
 
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
               <View style={styles.insightHeader}>
-                 <View style={[styles.trendCircle, { borderColor: theme.success + '40' }]}>
-                    <Ionicons 
-                      name={trendPercent.startsWith('+') ? "trending-up" : "trending-down"} 
-                      size={40} 
-                      color={trendPercent.startsWith('+') ? theme.success : theme.danger} 
-                    />
-                 </View>
-                 <Text style={[styles.insightTitle, { color: theme.text }]}>Growth Analysis</Text>
-                 <Text style={[styles.insightSub, { color: theme.muted }]}>
-                   Your sales volume has seen a {trendPercent} {trendPercent.startsWith('+') ? 'increase' : 'decrease'} compared to the previous period.
-                 </Text>
+                <View style={[styles.trendCircle, { borderColor: theme.success + '40' }]}>
+                  <Ionicons
+                    name={trendPercent.startsWith('+') ? "trending-up" : "trending-down"}
+                    size={40}
+                    color={trendPercent.startsWith('+') ? theme.success : theme.danger}
+                  />
+                </View>
+                <Text style={[styles.insightTitle, { color: theme.text }]}>Growth Analysis</Text>
+                <Text style={[styles.insightSub, { color: theme.muted }]}>
+                  Your sales volume has seen a {trendPercent} {trendPercent.startsWith('+') ? 'increase' : 'decrease'} compared to the previous period.
+                </Text>
               </View>
 
               <PremiumCard style={styles.insightStats}>
@@ -426,39 +426,39 @@ export default function DashboardScreen() {
                   <Text style={[styles.insightValue, { color: theme.text }]}>Friday</Text>
                 </View>
                 <View style={styles.insightRow}>
-                   <Text style={[styles.insightLabel, { color: theme.muted }]}>Average Volume</Text>
-                   <Text style={[styles.insightValue, { color: theme.text }]}>Frw 1.2M</Text>
+                  <Text style={[styles.insightLabel, { color: theme.muted }]}>Average Volume</Text>
+                  <Text style={[styles.insightValue, { color: theme.text }]}>Frw 1.2M</Text>
                 </View>
                 <View style={styles.insightRow}>
-                   <Text style={[styles.insightLabel, { color: theme.muted }]}>Growth Rate</Text>
-                   <Text style={[styles.insightValue, { color: theme.success }]}>{trendPercent}</Text>
+                  <Text style={[styles.insightLabel, { color: theme.muted }]}>Growth Rate</Text>
+                  <Text style={[styles.insightValue, { color: theme.success }]}>{trendPercent}</Text>
                 </View>
               </PremiumCard>
 
               <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 20 }]}>Recommendations</Text>
               <View style={styles.recList}>
-                 <View style={[styles.recItem, { backgroundColor: theme.primary + '10' }]}>
-                   <Ionicons name="bulb-outline" size={20} color={theme.primary} />
-                   <Text style={[styles.recText, { color: theme.text }]}>
-                     Friday shows highest activity. Consider increasing agent availability.
-                   </Text>
-                 </View>
-                 <View style={[styles.recItem, { backgroundColor: theme.info + '10' }]}>
-                   <Ionicons name="analytics-outline" size={20} color={theme.info} />
-                   <Text style={[styles.recText, { color: theme.text }]}>
-                     Mid-week dip detected. Launch a mini-promo to boost transaction volume.
-                   </Text>
-                 </View>
+                <View style={[styles.recItem, { backgroundColor: theme.primary + '10' }]}>
+                  <Ionicons name="bulb-outline" size={20} color={theme.primary} />
+                  <Text style={[styles.recText, { color: theme.text }]}>
+                    Friday shows highest activity. Consider increasing agent availability.
+                  </Text>
+                </View>
+                <View style={[styles.recItem, { backgroundColor: theme.info + '10' }]}>
+                  <Ionicons name="analytics-outline" size={20} color={theme.info} />
+                  <Text style={[styles.recText, { color: theme.text }]}>
+                    Mid-week dip detected. Launch a mini-promo to boost transaction volume.
+                  </Text>
+                </View>
               </View>
             </ScrollView>
 
             <View style={styles.modalFooter}>
-               <TouchableOpacity 
-                 style={[styles.doneBtn, { backgroundColor: theme.primary }]}
-                 onPress={() => setTrendModalVisible(false)}
-               >
-                 <Text style={styles.doneBtnText}>Got it!</Text>
-               </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.doneBtn, { backgroundColor: theme.primary }]}
+                onPress={() => setTrendModalVisible(false)}
+              >
+                <Text style={styles.doneBtnText}>Got it!</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -476,6 +476,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Spacing.lg,
+    paddingBottom: 120,
   },
   centered: {
     flex: 1,
