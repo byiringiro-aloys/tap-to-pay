@@ -163,23 +163,26 @@ export default function HistoryScreen() {
       />
 
       <View style={styles.sortContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.sortContent, { marginBottom: 12 }]}>
-          <FilterChip 
-            label="All Types" 
+        <View style={styles.segmentedControl}>
+          <FilterTab 
+            label="All Activity" 
+            icon="layers-outline"
             active={filterType === 'all'} 
             onPress={() => setFilterType('all')} 
           />
-          <FilterChip 
+          <FilterTab 
             label="Purchases" 
+            icon="cart-outline"
             active={filterType === 'debit'} 
             onPress={() => setFilterType('debit')} 
           />
-          <FilterChip 
+          <FilterTab 
             label="Top-ups" 
+            icon="wallet-outline"
             active={filterType === 'topup'} 
             onPress={() => setFilterType('topup')} 
           />
-        </ScrollView>
+        </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortContent}>
           <SortChip 
@@ -234,7 +237,7 @@ export default function HistoryScreen() {
       {/* Transaction Detail Modal */}
       <Modal visible={modalVisible && !!selectedTx} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>Transaction Details</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
@@ -299,25 +302,27 @@ export default function HistoryScreen() {
   );
 }
 
-function FilterChip({ label, active, onPress }: any) {
+function FilterTab({ label, active, onPress, icon }: any) {
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
   
   return (
     <TouchableOpacity 
       onPress={() => {
-        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (Platform.OS !== 'web') Haptics.selectionAsync();
         onPress();
       }}
       style={[
-        styles.filterChip, 
-        { 
-          backgroundColor: active ? theme.primary : theme.card,
-          borderColor: active ? theme.primary : theme.border,
-        },
+        styles.filterTab, 
+        active && [styles.filterTabActive, { backgroundColor: theme.card }]
       ]}
     >
-      <Text style={[styles.filterChipText, { color: active ? 'white' : theme.text }]}>
+      <Ionicons 
+        name={icon} 
+        size={16} 
+        color={active ? theme.primary : theme.muted} 
+      />
+      <Text style={[styles.filterTabText, { color: active ? theme.text : theme.muted }]}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -393,14 +398,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 10,
   },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    padding: 6,
     borderRadius: 20,
-    borderWidth: 1.5,
+    marginHorizontal: Spacing.lg,
+    marginBottom: 16,
   },
-  filterChipText: {
-    fontSize: 14,
+  filterTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 14,
+    gap: 6,
+  },
+  filterTabActive: {
+    ...Shadows.sm,
+  },
+  filterTabText: {
+    fontSize: 13,
     fontWeight: '800',
   },
   sortChip: {
@@ -509,9 +528,14 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     height: '80%',
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
     paddingTop: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   modalHeader: {
     flexDirection: 'row',

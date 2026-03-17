@@ -457,7 +457,7 @@ export default function SalesScreen() {
       {/* Checkout Modal */}
       <Modal visible={checkoutVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
+            <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
                 <View style={styles.modalHeader}>
                     <Text style={[styles.modalTitle, { color: theme.text }]}>Checkout</Text>
                     <TouchableOpacity onPress={() => setCheckoutVisible(false)}>
@@ -568,7 +568,7 @@ export default function SalesScreen() {
       {/* Receipt Modal */}
       <Modal visible={!!receiptData} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-            <View style={[styles.receiptModalContent, { backgroundColor: theme.background }]}>
+            <View style={[styles.receiptModalContent, { backgroundColor: theme.card }]}>
                 <View style={styles.receiptHeader}>
                     <Animated.View entering={FadeInUp.duration(600)} style={styles.checkCircle}>
                         <Ionicons name="checkmark" size={44} color="white" />
@@ -639,7 +639,7 @@ export default function SalesScreen() {
       {/* Product Detail Modal */}
       <Modal visible={detailVisible && !!selectedProduct} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-            <Animated.View entering={FadeInDown.duration(400)} style={[styles.detailModalContent, { backgroundColor: theme.background }]}>
+            <Animated.View entering={FadeInDown.duration(400)} style={[styles.detailModalContent, { backgroundColor: theme.card }]}>
                 <View style={[styles.detailHeader, { backgroundColor: theme.primary + '10' }]}>
                     <Text style={styles.detailIcon}>{selectedProduct?.icon}</Text>
                 </View>
@@ -867,9 +867,14 @@ const styles = StyleSheet.create({
   },
   modalContent: { 
     height: '85%', 
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
     borderTopLeftRadius: 36, 
     borderTopRightRadius: 36, 
-    paddingBottom: 30 
+    paddingBottom: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   modalHeader: { 
     flexDirection: 'row', 
@@ -947,7 +952,17 @@ const styles = StyleSheet.create({
   },
   payConfirmText: { color: 'white', fontSize: 18, fontWeight: '900' },
 
-  receiptModalContent: { flex: 1, marginTop: 60, borderTopLeftRadius: 40, borderTopRightRadius: 40 },
+  receiptModalContent: { 
+    flex: 1, 
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+    marginTop: 60, 
+    borderTopLeftRadius: 40, 
+    borderTopRightRadius: 40,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
   receiptHeader: { alignItems: 'center', paddingTop: 40, paddingBottom: 24 },
   checkCircle: { 
     width: 80, 
@@ -1000,9 +1015,14 @@ const styles = StyleSheet.create({
   },
   detailModalContent: {
     height: '70%',
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   detailHeader: {
     height: 180,

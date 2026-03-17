@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, View, Text, ScrollView, Alert, Platform, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, Alert, Platform, TouchableOpacity, Modal, Switch } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 import { Colors, Spacing, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -18,6 +18,12 @@ export default function ProfileScreen() {
   const theme = Colors[colorScheme];
   const [stats, setStats] = useState({ salesCount: 0, revenue: 0 });
   const [loading, setLoading] = useState(true);
+  const [securityVisible, setSecurityVisible] = useState(false);
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(true);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [pushReceipts, setPushReceipts] = useState(true);
+  const [emailReports, setEmailReports] = useState(false);
 
   const fetchUserStats = async () => {
     try {
@@ -143,7 +149,10 @@ export default function ProfileScreen() {
         <Animated.View entering={FadeInDown.delay(500).duration(600)} style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Preferences</Text>
           <PremiumCard style={styles.infoCard}>
-            <TouchableOpacity style={styles.settingsRow}>
+            <TouchableOpacity 
+              style={styles.settingsRow}
+              onPress={() => setSecurityVisible(true)}
+            >
               <View style={[styles.iconContainer, { backgroundColor: theme.warning + '15' }]}>
                 <Ionicons name="lock-closed-outline" size={20} color={theme.warning} />
               </View>
@@ -151,13 +160,16 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={18} color={theme.muted} />
             </TouchableOpacity>
 
-            <View style={[styles.settingsRow, { borderTopWidth: 1, borderTopColor: theme.border }]}>
+            <TouchableOpacity 
+              style={[styles.settingsRow, { borderTopWidth: 1, borderTopColor: theme.border }]}
+              onPress={() => setNotificationsVisible(true)}
+            >
               <View style={[styles.iconContainer, { backgroundColor: theme.info + '15' }]}>
                 <Ionicons name="notifications-outline" size={20} color={theme.info} />
               </View>
               <Text style={[styles.settingsText, { color: theme.text }]}>Notifications</Text>
               <Ionicons name="chevron-forward" size={18} color={theme.muted} />
-            </View>
+            </TouchableOpacity>
           </PremiumCard>
         </Animated.View>
 
@@ -174,6 +186,90 @@ export default function ProfileScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Security Settings Modal */}
+      <Modal visible={securityVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Security Settings</Text>
+              <TouchableOpacity onPress={() => setSecurityVisible(false)}>
+                <Ionicons name="close" size={24} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalBody}>
+              <View style={styles.settingToggleRow}>
+                <View style={styles.settingToggleInfo}>
+                  <Text style={[styles.settingLabel, { color: theme.text }]}>Biometric Authentication</Text>
+                  <Text style={[styles.settingDesc, { color: theme.muted }]}>Use FaceID or Fingerprint to log in</Text>
+                </View>
+                <Switch 
+                  value={biometricEnabled} 
+                  onValueChange={setBiometricEnabled}
+                  trackColor={{ false: theme.border, true: theme.primary }}
+                />
+              </View>
+              <View style={styles.settingToggleRow}>
+                <View style={styles.settingToggleInfo}>
+                  <Text style={[styles.settingLabel, { color: theme.text }]}>Two-Factor Authentication</Text>
+                  <Text style={[styles.settingDesc, { color: theme.muted }]}>Require a code when logging in</Text>
+                </View>
+                <Switch 
+                  value={twoFactorEnabled} 
+                  onValueChange={setTwoFactorEnabled}
+                  trackColor={{ false: theme.border, true: theme.primary }}
+                />
+              </View>
+              <PremiumButton 
+                title="Change Password" 
+                variant="outline"
+                icon={<Ionicons name="key-outline" size={20} color={theme.primary} />}
+                onPress={() => Alert.alert('Change Password', 'Password change instructions have been sent to your email.')}
+                style={{ marginTop: Spacing.xl }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Notifications Modal */}
+      <Modal visible={notificationsVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Notifications</Text>
+              <TouchableOpacity onPress={() => setNotificationsVisible(false)}>
+                <Ionicons name="close" size={24} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalBody}>
+              <View style={styles.settingToggleRow}>
+                <View style={styles.settingToggleInfo}>
+                  <Text style={[styles.settingLabel, { color: theme.text }]}>Push Receipts</Text>
+                  <Text style={[styles.settingDesc, { color: theme.muted }]}>Receive instant notifications for transactions</Text>
+                </View>
+                <Switch 
+                  value={pushReceipts} 
+                  onValueChange={setPushReceipts}
+                  trackColor={{ false: theme.border, true: theme.primary }}
+                />
+              </View>
+              <View style={styles.settingToggleRow}>
+                <View style={styles.settingToggleInfo}>
+                  <Text style={[styles.settingLabel, { color: theme.text }]}>Daily Email Reports</Text>
+                  <Text style={[styles.settingDesc, { color: theme.muted }]}>Get daily summary at end of day</Text>
+                </View>
+                <Switch 
+                  value={emailReports} 
+                  onValueChange={setEmailReports}
+                  trackColor={{ false: theme.border, true: theme.primary }}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -303,6 +399,58 @@ const styles = StyleSheet.create({
     marginTop: Spacing.lg,
     fontSize: 12,
     fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    minHeight: '40%',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.xl,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+  },
+  modalBody: {
+    padding: Spacing.xl,
+  },
+  settingToggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+  },
+  settingToggleInfo: {
+    flex: 1,
+    marginRight: Spacing.lg,
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  settingDesc: {
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
   },
 });
 

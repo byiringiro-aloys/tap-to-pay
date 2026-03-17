@@ -397,7 +397,7 @@ export default function DashboardScreen() {
       {/* Performance Detail Modal */}
       <Modal visible={trendModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>Performance Insights</Text>
               <TouchableOpacity onPress={() => setTrendModalVisible(false)} style={styles.closeBtn}>
@@ -712,9 +712,14 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     height: '85%',
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
     paddingTop: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   modalHeader: {
     flexDirection: 'row',

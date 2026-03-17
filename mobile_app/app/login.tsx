@@ -54,6 +54,8 @@ export default function LoginScreen() {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <LinearGradient
         colors={[theme.primary, theme.secondary]}
+        start={{ x: 0, y: 0.2 }}
+        end={{ x: 1, y: 1 }}
         style={styles.backgroundGradient}
       >
         <View style={styles.circle1} />

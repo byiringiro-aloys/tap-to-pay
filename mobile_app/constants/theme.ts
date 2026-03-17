@@ -1,11 +1,11 @@
 import { Platform } from 'react-native';
 
-const primary = '#6366f1'; // Indigo
-const secondary = '#a855f7'; // Purple
+const primary = '#0F172A'; // Obsidian Slate (Premium Dark)
+const secondary = '#1E3A8A'; // Deep Midnight Blue
 const success = '#10b981'; // Emerald
 const warning = '#f59e0b'; // Amber
-const danger = '#ef4444'; // Rose
-const info = '#0ea5e9'; // Sky
+const danger = '#e11d48'; // Premium Rose/Red
+const info = '#0284c7'; // Rich Sky
 
 export const Colors = {
   light: {
@@ -23,28 +23,28 @@ export const Colors = {
     warning,
     danger,
     info,
-    muted: '#64748b',
+    muted: '#475569',
     subtle: '#f1f5f9',
-    glass: 'rgba(255, 255, 255, 0.7)',
+    glass: 'rgba(255, 255, 255, 0.85)',
   },
   dark: {
     text: '#f8fafc',
     background: '#020617',
-    tint: primary,
+    tint: '#38bdf8',
     icon: '#94a3b8',
-    tabIconDefault: '#334155',
-    tabIconSelected: primary,
-    card: '#0f172a',
+    tabIconDefault: '#475569',
+    tabIconSelected: '#38bdf8',
+    card: '#0B1121', // Deeper than base background
     border: '#1e293b',
-    primary,
-    secondary,
+    primary: '#1E293B', // Slightly lighter slate for dark mode cards if needed, but primary actions might be better as an accent
+    secondary: '#0F172A', // Dark slate
     success,
     warning,
     danger,
     info,
     muted: '#94a3b8',
     subtle: '#1e293b',
-    glass: 'rgba(15, 23, 42, 0.7)',
+    glass: 'rgba(15, 23, 42, 0.85)',
   },
 };
 
